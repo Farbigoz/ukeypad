@@ -55,17 +55,17 @@ Implemented today:
 
 ## Roadmap overview
 
-| Phase | Goal | Result |
+| Phase | Goal | Current status |
 |---|---|---|
-| 0 | Stabilize the current firmware | Reliable baseline and regression checks |
-| 1 | Introduce compile-time device description | One codebase supports different input layouts |
-| 2 | Add Hall-effect input support | Digital and analog/Hall keys share the event pipeline |
-| 3 | Support mixed input devices | A device may contain digital and Hall slots in any configured count |
-| 4 | Expose capabilities/configuration over CDC | GUI can discover the device instead of hardcoding it |
-| 5 | Build a dynamic configurator | GUI adapts to input types, counts, settings, and binds |
-| 6 | Add configurable RGB lighting | Lighting hardware and controls are capability-driven |
-| 7 | Verification and release hardening | Reproducible profiles, migration, diagnostics, documentation |
-| 8 | Add validated MCU backends | Support only platforms with a suitable native USB/SDK stack |
+| 0 | Stabilize the current firmware | 0.1/0.2 complete; 0.3 and hardware checks pending |
+| 1 | Introduce compile-time device description | Profile foundation complete; multiple profiles and slot-aware events pending |
+| 2 | Add Hall-effect input support | Not started |
+| 3 | Support mixed input devices | Not started |
+| 4 | Expose capabilities/configuration over CDC | Firmware description complete; GUI consumption pending |
+| 5 | Build a dynamic configurator | Not started |
+| 6 | Add configurable RGB lighting | Not started |
+| 7 | Verification and release hardening | Not started; hardware validation pending |
+| 8 | Add validated MCU backends | Not started |
 
 ---
 
@@ -74,47 +74,185 @@ Implemented today:
 Do this before adding new sensor types. It prevents new architecture from being
 built on undocumented assumptions.
 
-### 0.1 Configuration format and versioning
+### 0.1 Configuration format and versioning — complete
 
-- Add a versioned NVS record with `magic`, `version`, payload length, and CRC.
-- Deliberately reject the old six-byte binding format; no migration is supported.
-- Validate every loaded HID code and fall back to defaults on corruption.
-- Make NVS write failures visible as `ERR code=NVS_WRITE_FAILED`.
-- Keep debounce persistence separate from hardware description.
+Implemented in `src/ConfigStorage.*` and `src/FirmwareVersion.h`:
 
-### 0.2 Protocol contract
+- versioned NVS record with `magic`, `version`, payload length, and CRC;
+- deliberate rejection of the old six-byte binding format; no migration;
+- HID-code validation with atomic fallback to profile defaults;
+- `ERR code=NVS_WRITE_FAILED` on failed writes;
+- debounce remains runtime-only and separate from the binding record.
 
-- Document all CDC commands and response fields.
-- Add `info` fields with stable names, for example:
-  - `model`;
-  - `firmware`;
-  - `protocol`;
-  - `config_version`;
-  - `input_count`;
-  - `input_types`;
-  - `led_count`;
-  - `capabilities`.
-- Define one-line responses for machine parsing and a human-readable mode only
-  if it is useful.
-- Add a command to request the complete device description in one response.
+### 0.2 Protocol contract — firmware foundation complete
 
-### 0.3 Diagnostics and recovery
+Implemented in `src/DeviceMetadata.*`, `src/Config.*`, and the configurator:
 
-- Keep `test` on the same timer/debounce path as normal mode.
-- Add explicit USB disconnect/reconnect state handling.
-- Add queue overflow and maximum-depth counters.
-- Add a full HID release/reset command for recovery.
-- Add a boot-time validation window so a stuck key cannot accidentally make
-  config mode difficult to leave.
+- stable `info` fields: `model`, `firmware`, `protocol`, `config_version`,
+  `input_count`, `input_types`, `led_count`, and `capabilities`;
+- framed multiline `get_device` response with `device_begin`/`device_end`;
+- deterministic `OK`/`ERR code=...` responses;
+- explicit `OK list` terminator;
+- protocol and storage behavior documented in `README.md`.
 
-### 0.4 Regression checklist
+The configurator still uses a fixed six-slot layout. Dynamic descriptor-driven
+rendering belongs to Phase 5.
 
-- Build with the installed PlatformIO/Arduino core.
-- Test all six keys individually and simultaneously.
-- Test duplicate bindings, including duplicate modifiers.
-- Disconnect USB while keys are held and verify no stuck key after reconnect.
-- Verify config mode never emits HID keypresses.
-- Verify NVS save/load/reset and invalid-data fallback.
+### 0.3 Diagnostics and recovery — partially complete
+
+Implemented:
+
+- `test` on the same scan/debounce path;
+- scan, event, overflow, and maximum queue-depth counters;
+- HID release/reset on USB stop/disconnect;
+- config mode consumes events without HID output.
+
+Pending:
+
+- explicit user-command full HID release/reset;
+- boot-time validation window for a stuck key;
+- dedicated USB reconnect state/diagnostics beyond the current stop callback.
+
+### 0.4 Regression checklist — static checks complete, hardware pending
+
+Completed in development:
+
+- PlatformIO build;
+- configurator JavaScript syntax check;
+- configurator HTML parse check;
+- diff/static review of the latency-critical path.
+
+Still requires real hardware:
+
+- individual, simultaneous, duplicate, and modifier bindings;
+- USB disconnect while keys are held;
+- config-mode HID suppression;
+- NVS save/load/reset and corrupt-record fallback;
+- measured scan frequency, debounce timing, and end-to-end HID latency.
+
+Do not mark these hardware checks complete without testing the device.
+
+---
+
+## Current source-of-truth files
+
+- `src/DeviceProfile.h` — model, USB mode, physical input slots, GPIOs,
+  default bindings, scan frequency, timer derivation, debounce default, LEDs,
+  capabilities, and compile-time profile validation.
+- `src/FirmwareVersion.h` — firmware, CDC protocol, and NVS format versions.
+- `src/ConfigStorage.*` — versioned NVS serialization, CRC, and validation.
+- `src/DeviceMetadata.*` — machine-readable CDC output; not a configuration
+  source.
+- `src/KeyNameTable.*` — HID name parsing and reverse lookup.
+
+The current profile is six digital inputs at 2000 Hz with a default debounce
+threshold of four samples. Runtime debounce changes are temporary and are not
+persisted.
+
+---
+
+## Phase 0 exit criteria
+
+Phase 0 is considered firmware-complete when sections 0.1 and 0.2 remain
+implemented, the pending 0.3 recovery commands are addressed, and the hardware
+regression checklist has been executed on the reference device. Static build
+checks alone do not constitute release validation.
+
+---
+
+## Phase 1 — Compile-time device description
+
+### Current status
+
+The profile foundation is implemented in `src/DeviceProfile.h`. Current code
+uses profile data for GPIOs, default bindings, input count, scan frequency,
+timer alarm derivation, debounce default, LED count, and capabilities. Safety
+checks cover reserved/unsafe GPIOs and duplicate pins.
+
+The phase is not complete because the project still has only one six-digital
+profile, the standard HID path is limited to six simultaneous non-modifier
+keys, and events do not yet carry a physical slot identifier.
+
+### Remaining work
+
+- add at least one additional digital profile, such as a two-input profile;
+- define profile selection through PlatformIO environments or a selected header;
+- keep each profile buildable without copying source files;
+- add `slot` to `KeyEvent` and preserve it through the queue for diagnostics and
+  future mixed input handling;
+- decide whether profiles larger than six require a custom HID report before
+  advertising ten-input support;
+- keep profile validation and safe-GPIO checks compile-time where possible.
+
+---
+
+## Phase 2 — Hall-effect input support
+
+Not started. First choose the supported sensor type and exact ESP32-S3 wiring
+before implementing ADC, digital Hall, or I2C/SPI support.
+
+---
+
+## Phase 3 — Mixed digital and Hall inputs
+
+Not started. Depends on Phase 2 and the slot-aware common event model from
+Phase 1.
+
+---
+
+## Phase 4 — Device description and protocol
+
+### Current status
+
+The firmware-side description protocol is complete: `info`, `get_device`,
+stable fields, framed multiline output, capabilities, GPIO metadata, and
+protocol version are implemented and documented.
+
+The remaining GUI work is tracked in Phase 5. Do not duplicate the firmware
+profile in the GUI when dynamic discovery is implemented.
+
+### Remaining work
+
+- define how the GUI handles unsupported protocol versions;
+- define required versus optional descriptor fields;
+- add a current-configuration descriptor when transaction support is designed.
+
+---
+
+## Phase 5 — Universal dynamic GUI
+
+Not started. Replace the fixed six-row form with descriptor-driven rendering
+only after the device description contract and slot metadata are stable.
+
+---
+
+## Phase 6 — RGB lighting
+
+Not started. The current profile reports zero LEDs and no RGB backend exists.
+
+---
+
+## Phase 7 — Release hardening
+
+Not started. This phase must include real hardware validation, corrupted-record
+recovery, USB disconnect tests, all supported profile builds, and GUI testing
+against each descriptor. It must **not** require migration of the rejected old
+six-byte NVS format; test that old records are rejected and defaults are used.
+
+---
+
+## Phase 8 — Additional MCU backends
+
+Not started. Follow the platform acceptance policy below; do not advertise a
+backend before real USB, timing, storage, and (where applicable) ADC/DMA tests.
+
+---
+
+## Legacy roadmap detail
+
+The sections below retain design detail for Hall, mixed-input, GUI, RGB, and
+backend work. Their status is governed by the phase status above; examples using
+Hall inputs or LEDs are conceptual future examples, not current firmware output.
 
 ---
 
@@ -122,9 +260,9 @@ built on undocumented assumptions.
 
 The project will not promise support for a microcontroller merely because an
 Arduino core exists. A platform is supported only when it has a stable,
-maintained USB device stack suitable for HID + CDC, a documented way to build
-and flash with PlatformIO, and enough timer/GPIO/ADC/storage functionality for
-the selected device profile.
+maintained USB device stack suitable for HID + CDC, a documented way to build and
+flash with PlatformIO, and enough timer/GPIO/ADC/storage functionality for the
+selected device profile.
 
 ### Preferred implementation layers
 
@@ -187,513 +325,50 @@ Each backend provides the strong definitions for its platform. Weak defaults
 may return `false` or compile-time errors for optional features, but must not
 silently pretend that USB/ADC/storage is available.
 
-Compile-time templates/type-erased static adapters are also valid when a
-backend benefits from them:
-
-```cpp
-template<class InputBackend, class HidBackend, class StorageBackend>
-class KeypadApplication { /* composition only; no virtual dispatch */ };
-```
-
-Use this only for composition and testability. Do not introduce ETL delegates
-or a general callback framework until a real requirement appears; static
-functions and a small C API are simpler for the current embedded scope.
-
-Weak hooks are useful at the platform boundary, not for every internal event.
-Core logic should call concrete, statically selected functions so the compiler
-can inline latency-sensitive paths and detect missing backend symbols at link
-time.
-
-### Platform acceptance checklist
-
-Before adding a platform to the supported list, verify on real hardware:
-
-- USB HID keyboard enumerates reliably;
-- USB CDC enumerates and works with the existing configurator;
-- USB disconnect/reconnect clears HID state;
-- PlatformIO build and upload are documented and repeatable;
-- digital input scan meets the target frequency;
-- timer/interrupt behaviour is measured, not assumed;
-- ADC continuous/scan + DMA works if Hall profiles are claimed;
-- configuration storage survives reset and power loss tests;
-- safe GPIO/ADC restrictions are encoded in the device profile;
-- memory and worst-case timing fit the smallest advertised board.
-
-A platform that fails one of these is experimental until the specific gap is
-fixed. The GUI and common protocol should not need platform-specific hacks.
+Keep this interface as future design guidance; it is not implemented yet.
 
 ---
-
-## Phase 1 — Compile-time device description
-
-This is the foundation for a universal device. It should be implemented before
-Hall sensors or GUI generalization.
-
-### 1.1 Replace hardcoded keypad constants
-
-Introduce a central compile-time description, for example:
-
-```cpp
-// DeviceConfig.h
-struct DigitalInputConfig {
-    uint8_t gpio;
-};
-
-struct HallInputConfig {
-    uint8_t adcChannel;
-    uint8_t gpio;
-};
-
-enum class InputType : uint8_t {
-    Digital,
-    Hall
-};
-
-struct InputConfig {
-    InputType type;
-    uint8_t   pin;
-    uint8_t   auxPin;
-};
-
-static constexpr InputConfig INPUTS[] = {
-    { InputType::Digital, 4,  0 },
-    { InputType::Digital, 5,  0 },
-    { InputType::Hall,    1,  0 },
-};
-```
-
-The exact representation should be decided after checking ESP32-S3 ADC
-channel/pin constraints. The important point is that one table describes the
-physical device at compile time.
-
-### 1.2 Compile-time profiles
-
-Start with named PlatformIO environments or a selected header:
-
-- `device_digital_6` — current six MX-style switches;
-- `device_digital_2` — minimal two-button keypad;
-- `device_hall_2` — two Hall keys;
-- `device_mixed_6` — digital + Hall inputs in one device.
-
-Each profile should define:
-
-- configured input count (for example 2, 6, or 10);
-- input type for each physical slot;
-- GPIO/ADC assignments;
-- scan requirements;
-- default bindings;
-- LED configuration, when RGB exists.
-
-Avoid copying source files between profiles. Only the description and selected
-backend should differ.
-
-### 1.3 Hardware safety validation
-
-Add compile-time and startup validation for:
-
-- duplicate GPIOs;
-- GPIOs 19/20 reserved for native USB;
-- flash/PSRAM pins;
-- strapping pins;
-- ADC-capable pins for Hall inputs;
-- maximum input count for the HID report and event queue;
-- incompatible ADC attenuation/resolution settings.
-
-An invalid profile should fail the build when possible, not fail silently at
-runtime.
-
-### 1.4 Refactor input ownership
-
-Refactor `Keypad` so it owns a fixed array of input backends or a tagged union,
-not an array that assumes every input is a `Button`:
-
-```text
-Keypad
-  ├── DigitalInput / Button
-  ├── HallInput
-  └── Event queue
-```
-
-The queue and HID layers should consume common events. They should not need to
-know whether an event came from a digital or Hall sensor.
-
----
-
-## Phase 2 — Hall-effect input support
-
-Hall support should be added as a separate backend before mixing types.
-
-### 2.1 Define the Hall sensor contract
-
-Decide which sensor hardware is supported first:
-
-- analog Hall sensor connected to an ESP32-S3 ADC pin; or
-- digital Hall switch with a threshold output; or
-- external I2C/SPI magnetic sensor.
-
-The first implementation should target the simplest sensor that can meet the
-sampling and latency requirements. Analog sensors require calibration and
-stable ADC handling; digital Hall switches can reuse much of the digital
-button path but do not provide Rapid Trigger depth information.
-
-### 2.2 Hall sampling backend
-
-Implement a `HallInput` class responsible for:
-
-- ADC acquisition;
-- optional oversampling/filtering;
-- baseline and polarity;
-- calibration state;
-- actuation threshold;
-- release threshold;
-- hysteresis;
-- sensor fault detection.
-
-Do not put USB, NVS, or GUI logic into `HallInput`.
-
-### 2.3 Calibration
-
-Define a safe calibration flow:
-
-```text
-calibrate start <slot>
-calibrate released
-calibrate pressed
-calibrate save
-```
-
-Or provide a GUI wizard. Calibration data should include:
-
-- released value;
-- pressed value;
-- polarity;
-- actuation threshold;
-- release threshold;
-- sensor range/quality.
-
-Calibration must never run from the profile-defined scan ISR and must not write NVS for
-every ADC sample.
-
-### 2.4 Rapid Trigger as a separate feature
-
-Do not couple basic Hall key detection and Rapid Trigger into one first step.
-Implement in this order:
-
-1. stable analog position reporting;
-2. fixed actuation/release hysteresis;
-3. configurable actuation depth;
-4. configurable release depth;
-5. Rapid Trigger based on movement direction and delta;
-6. per-key tuning and diagnostic plots.
-
-The regular event interface should remain `Press`/`Release` initially. A future
-position event can be added only if the GUI or macro engine needs it.
-
-### 2.5 Hall test and diagnostics
-
-Extend config mode with:
-
-```text
-hall read <slot>
-hall calibrate <slot>
-hall status <slot>
-hall stream <slot> on|off
-```
-
-The stream must be rate-limited and disabled by default so it cannot flood CDC
-or disturb input timing.
-
----
-
-## Phase 3 — Mixed digital and Hall inputs
-
-Once each backend works separately, support a compile-time mixed table.
-
-### 3.1 Common slot model
-
-Every slot should expose metadata:
-
-```text
-slot index
-input type: digital | hall
-physical pin/channel
-current binding
-capabilities
-calibration support
-```
-
-The slot array contains only real physical buttons. A two-button device has
-`input_count=2`; it does not expose four disabled placeholder slots. A
-10-button device has `input_count=10`, subject to the selected HID report and
-queue limits.
-
-### 3.2 Common event semantics
-
-Both backends should produce the same high-level events:
-
-```cpp
-enum class KeyEventType { Press, Release };
-struct KeyEvent {
-    uint8_t slot;
-    KeyEventType type;
-    HidKeycode keyCode;
-};
-```
-
-Adding `slot` is important for diagnostics, duplicate binding management, and
-GUI test output. It avoids trying to infer the physical source from a keycode.
-
-### 3.3 Scheduling
-
-Start with one timer and one scan pass that visits every configured backend.
-Only optimize to separate ADC/DMA tasks if measurements show the scan budget is
-not sufficient. The scan path must have a documented worst-case execution time.
-
-### 3.4 Input-specific settings
-
-Keep common settings separate from backend-specific settings:
-
-```text
-common: binding, enabled, debounce
-hall: calibration, actuation, release, rapid_trigger
-led: brightness, color, effect
-```
-
-A digital slot should not expose Hall-only controls in the GUI.
-
----
-
-## Phase 4 — Device description and protocol
-
-The GUI must not hardcode six digital buttons forever. Firmware should expose a
-machine-readable description.
-
-### 4.1 Capability response
-
-Add a command such as:
-
-```text
-get_device
-```
-
-Recommended response strategy:
-
-- begin marker;
-- one JSON-like or key-value line per field;
-- end marker;
-- explicit `OK`/`ERR` result.
-
-Example conceptual response:
-
-```text
-OK device model=ukeypad-esp32-s3 firmware=0.2.0 protocol=2
-OK inputs count=6 types=digital,digital,digital,digital,hall,hall
-OK leds count=16 rgb=ws2812 brightness=true effects=true
-OK capabilities binds=true test=true debounce=true calibration=true
-OK device_end
-```
-
-A compact binary protocol can be introduced later if the text protocol becomes
-too large. The first GUI should use the text protocol for debuggability.
-
-### 4.2 Protocol versioning
-
-The GUI should query the protocol version before rendering. Unknown fields must
-be ignored; missing required fields should produce a clear error. Do not infer
-hardware type from model strings.
-
-### 4.3 Atomic configuration transactions
-
-When configuration grows beyond one bind:
-
-```text
-config begin
-config set input 2 bind F13
-config set input 2 actuation 0.35
-config set led brightness 80
-config validate
-config commit
-```
-
-`commit` should validate the complete configuration and write it once. This
-avoids partially applied settings after a disconnect.
-
----
-
-## Phase 5 — Universal dynamic GUI
-
-Refactor [docs/configurator.html](docs/configurator.html) from a fixed six-row form into
-a capability-driven UI.
-
-### 5.1 Device discovery
-
-On connect:
-
-1. query protocol version;
-2. query device description;
-3. query current configuration;
-4. build input cards from returned metadata;
-5. show only controls supported by each slot;
-6. render lighting controls only when LEDs are reported.
-
-### 5.2 Input cards
-
-Digital input card:
-
-- slot number;
-- GPIO label;
-- binding selector;
-- debounce control;
-- test state;
-- enabled/disabled state.
-
-Hall input card:
-
-- slot number;
-- ADC/channel label;
-- binding selector;
-- live position indicator;
-- calibration wizard;
-- actuation threshold;
-- release threshold;
-- Rapid Trigger controls;
-- sensor health/status.
-
-The GUI renders exactly `input_count` physical slots. It does not render
-placeholder rows for unpopulated buttons.
-
-### 5.3 Configuration workflow
-
-Use a local pending state in the browser:
-
-```text
-connect → read device/config → edit locally → validate → preview → commit/save
-```
-
-Do not send every slider movement directly to NVS. Debounce UI updates and
-commit explicitly. Warn the user before rebooting or changing sensor
-calibration.
-
-### 5.4 Test and visualization
-
-- show debounced press/release events per slot;
-- show raw/filtered Hall position only when requested;
-- show queue and scan diagnostics;
-- display clear `OK`/`ERR code=...` messages;
-- allow exporting/importing a configuration file on the host.
-
----
-
-## Phase 6 — RGB lighting
-
-RGB is intentionally postponed until the input/configuration model is stable.
-
-### 6.1 Hardware abstraction
-
-Create an `LedController` independent of input and HID layers. Initially target
-WS2812/SK6812 through ESP32-S3 RMT, not timing-sensitive bit-banging.
-
-Compile-time LED description should include:
-
-- LED type;
-- data GPIO;
-- LED count;
-- RGB vs RGBW;
-- color order;
-- maximum current policy.
-
-### 6.2 Firmware capabilities
-
-Expose:
-
-```text
-led info
-led set brightness <0..100>
-led set pixel <index> <r> <g> <b>
-led effect <name>
-led save
-```
-
-All LED updates must run outside the profile-defined input ISR. A low-priority task or
-scheduled update is preferred.
-
-### 6.3 GUI controls
-
-Render lighting controls only if the device reports LED support:
-
-- global brightness;
-- per-key colors;
-- idle/pressed/released colors;
-- config/test/error colors;
-- effect selection and speed;
-- preview;
-- save/apply/reset.
-
-The GUI must warn about current draw and avoid high-frequency writes to NVS.
-
-### 6.4 Interaction with input slots
-
-The initial LED model is intentionally simple: LED index equals input slot
-index, and `led_count == input_count`. The capability descriptor should still
-report both counts explicitly so a later hardware revision can add status LEDs
-or a different mapping without breaking protocol versioning.
-
----
-
-## Phase 7 — Release hardening
-
-Before calling the universal version stable:
-
-- test every compile-time device profile;
-- test digital-only, Hall-only, and mixed configurations;
-- test 2-input, 6-input, 10-input, and maximum-supported profiles;
-- validate USB disconnect while keys are held;
-- validate NVS migration and corrupted data recovery;
-- test GUI against each capability response;
-- test config transactions interrupted during USB disconnect;
-- measure scan worst-case execution time with all sensors enabled;
-- document wiring, ADC restrictions, calibration, and safe GPIOs;
-- keep a minimal HID-only build for environments where CDC is undesirable.
-
-## Suggested next iteration order
-
-The original requests are broad but fit naturally into the following small
-iterations:
-
-1. **NVS/protocol foundation**: version, CRC, `get_device`, stable errors.
-2. **Compile-time device profiles**: digital 2/6/10-key profiles and mixed
-   profiles with a configured physical slot count.
-3. **Input abstraction refactor**: common slot metadata and `slot` in events.
-4. **First Hall backend**: one sensor type, one Hall test command.
-5. **Hall calibration**: released/pressed values and hysteresis.
-6. **Mixed profile**: digital + Hall in one compile-time table.
-7. **GUI discovery**: build digital-only UI dynamically from firmware data.
-8. **GUI Hall controls**: calibration and live diagnostics.
-9. **RGB abstraction and capability reporting**.
-10. **GUI RGB controls and final integration tests**.
-11. **Validated MCU backends**: RP2040/RP2350, selected STM32 families, then
-    nRF52840 if the USB and storage acceptance checklist passes. Evaluate CH32
-    separately; do not advertise it without a reliable native USB path.
-
-This order keeps each change buildable and testable. It also avoids writing a
-large GUI abstraction before the firmware has a stable device-description
-protocol.
 
 ## Open decisions
 
-These should be resolved before implementation of the corresponding phase:
+Resolve these before implementing the corresponding phase:
 
 - Which Hall sensor is the first supported hardware: analog voltage sensor,
   digital Hall switch, or external I2C/SPI sensor?
 - Are Hall sensors connected directly to ESP32-S3 ADC pins, and which exact
   SuperMini pins are available on the target PCB?
-- Is one timer scan pass sufficient for the maximum planned number of Hall
-  channels, or is ADC continuous/DMA mode needed?
-- Should the HID report remain six-key rollover, or should the universal
-  profile support a larger custom report?
-- Should the CDC protocol stay line-oriented text, or transition to framed JSON
-  or a binary protocol after capability discovery is implemented?
-- What exact RGB hardware is planned under each button (WS2812/SK6812 or
-  another part), and what is the maximum LED current budget? The initial
-  software model assumes one LED per physical button.
-- Which settings are runtime-only and which are persisted in NVS?
+- Is one timer scan pass sufficient for the maximum planned Hall channels, or is
+  ADC continuous/DMA mode needed?
+- Should profiles larger than six inputs use a custom HID report, or should the
+  first multi-profile release remain limited to six-key rollover?
+- Should the CDC protocol remain line-oriented text, or transition to framed
+  JSON/binary only if capability discovery outgrows text?
+- What exact RGB hardware is planned, and what is the maximum LED current budget?
+- Which settings are runtime-only and which are persisted in NVS? Current
+  bindings persist; debounce does not.
+
+---
+
+## Historical iteration order
+
+The original implementation order covered NVS/protocol foundation, compile-time
+profiles, input abstraction, Hall support, mixed profiles, GUI discovery, RGB,
+and additional MCU backends. The NVS/protocol foundation and initial firmware
+device-description work are now complete; this historical list is retained only
+for context.
+
+## Active next-iteration order
+
+1. Complete Phase 0.3 recovery commands and document their behavior.
+2. Add `slot` to `KeyEvent` and verify the current digital profile unchanged.
+3. Add and build a second digital profile, likely a two-input profile.
+4. Decide the HID report strategy for profiles larger than six inputs.
+5. Select the first Hall sensor and implement its isolated backend.
+6. Add calibration/hysteresis and then a mixed digital/Hall profile.
+7. Make the configurator consume `get_device` dynamically.
+8. Add RGB hardware abstraction only after input/profile capabilities are stable.
+9. Harden supported profiles and perform real hardware acceptance tests.
+10. Evaluate additional MCU backends only after the acceptance checklist passes.
+
+This order reflects the actual repository state and avoids repeating completed
+NVS/protocol work.
