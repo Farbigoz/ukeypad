@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A low-latency, configurable USB HID keypad platform for small microcontroller boards.">
+  <title>USB HID Keypad</title>
+  <style>
+    :root { color-scheme: dark; --bg: #0f1117; --panel: #191d27; --line: #303748; --text: #f1f4fb; --muted: #aab3c5; --accent: #83a8ff; --accent2: #6ce0aa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--text); background: radial-gradient(circle at 15% 0%, #253453, var(--bg) 48%); font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(1060px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 76px 0 48px; }
+    .eyebrow { margin: 0 0 10px; color: var(--accent2); font: 700 13px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { max-width: 780px; margin: 0; font-size: clamp(38px, 7vw, 68px); line-height: 1.02; letter-spacing: -.04em; }
+    .lead { max-width: 720px; margin: 24px 0 0; color: var(--muted); font-size: 20px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    a.button { display: inline-block; padding: 11px 16px; border: 1px solid #5d7bc5; border-radius: 9px; color: white; background: #304b88; text-decoration: none; font-weight: 650; }
+    a.button.secondary { border-color: var(--line); background: #252b39; }
+    a.button:hover { filter: brightness(1.15); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; padding-bottom: 28px; }
+    .card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: 0 12px 32px #0003; }
+    .card h2 { margin: 0 0 8px; font-size: 19px; }
+    .card p { margin: 0; color: var(--muted); }
+    .wide { grid-column: 1 / -1; }
+    .architecture { overflow-x: auto; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #090b10aa; color: #cbd6f5; font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    footer { display: flex; justify-content: space-between; gap: 20px; padding: 28px 0 44px; color: var(--muted); font-size: 14px; }
+    footer a { color: var(--accent); }
+    @media (max-width: 600px) { main { width: min(100% - 20px, 1060px); } header { padding-top: 48px; } .lead { font-size: 18px; } footer { display: block; } footer span { display: block; margin-top: 8px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Open-source embedded input platform</p>
+    <h1>Small, fast, configurable USB HID devices.</h1>
+    <p class="lead">A low-latency firmware and hardware abstraction project for compact keypads and custom input controllers built around accessible microcontroller boards.</p>
+    <div class="actions">
+      <a class="button" href="configurator.html">Open configurator</a>
+      <a class="button secondary" href="https://github.com/Farbigoz/ukeypad" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+  </header>
+
+  <section class="grid">
+    <article class="card"><h2>USB-first</h2><p>Standard HID keyboard output with a deterministic scan path and a configuration channel for setup and diagnostics.</p></article>
+    <article class="card"><h2>Digital and Hall inputs</h2><p>Designed to support ordinary mechanical switches, Hall-effect sensors, and mixed devices through compile-time hardware profiles.</p></article>
+    <article class="card"><h2>Capability-driven</h2><p>The firmware describes its inputs and features so the browser configurator can build the right interface for each device.</p></article>
+    <article class="card"><h2>Small-board friendly</h2><p>Targeting inexpensive USB-capable development boards instead of one fixed controller or proprietary hardware.</p></article>
+  </section>
+
+  <section class="grid">
+    <article class="card wide">
+      <h2>Current reference device</h2>
+      <p>The current implementation targets an ESP32-S3 SuperMini with six digital inputs, 2000 Hz scanning, integrator debounce, duplicate-binding support, USB HID, USB CDC configuration, NVS persistence, and a standalone Web Serial configurator.</p>
+    </article>
+    <article class="card wide">
+      <h2>Planned direction</h2>
+      <p>Future iterations will add compile-time device descriptions, variable button counts, Hall sensor backends with ADC/DMA, mixed digital/Hall devices, dynamic GUI discovery, and one RGB LED per physical button.</p>
+    </article>
+  </section>
+
+  <section class="architecture">
+    input hardware → timer / ADC + DMA → debounce or Hall processing
+                   → common KeyEvent pipeline → HID backend
+                   ↘ CDC config protocol ↔ Web Serial configurator
+  </section>
+
+  <footer>
+    <span>USB HID Keypad · open source · early development</span>
+    <span><a href="https://github.com/Farbigoz/ukeypad" target="_blank" rel="noopener">github.com/Farbigoz/ukeypad</a></span>
+  </footer>
+</main>
+</body>
+</html>

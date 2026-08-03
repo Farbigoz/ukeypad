@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USB HID keypad configurator</title>
+  <style>
+    :root { color-scheme: dark; --bg: #101218; --panel: #191c25; --line: #303544; --text: #edf0f7; --muted: #9ba3b5; --accent: #7aa2ff; --good: #55d187; --bad: #ff7070; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #20283b, var(--bg) 48%); color: var(--text); font: 15px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+    main { width: min(980px, calc(100% - 32px)); margin: 32px auto; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    p { color: var(--muted); }
+    .subtitle { margin: 0 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .panel { background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: 0 10px 30px #0003; }
+    .wide { grid-column: 1 / -1; }
+    .toolbar, .actions, .status { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    button, select, input { border: 1px solid var(--line); border-radius: 8px; background: #242938; color: var(--text); padding: 9px 11px; font: inherit; }
+    button { cursor: pointer; background: #2c3d69; border-color: #506ba8; }
+    button:hover:not(:disabled) { filter: brightness(1.16); }
+    button.secondary { background: #252a36; border-color: var(--line); }
+    button.danger { background: #63343b; border-color: #a0525d; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    .status { margin: 14px 0 0; color: var(--muted); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); }
+    .dot.connected { background: var(--good); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 9px 7px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; }
+    td:first-child { width: 70px; color: var(--muted); }
+    td:nth-child(2) { color: var(--muted); width: 90px; }
+    select { width: 100%; }
+    code { color: #b8c9ff; }
+    .hint { margin: 10px 0 0; font-size: 13px; }
+    pre { min-height: 170px; max-height: 300px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #0a0c11; color: #cbd5e9; white-space: pre-wrap; word-break: break-word; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .unsupported { color: #ffd166; }
+    @media (max-width: 600px) { main { width: min(100% - 18px, 980px); margin: 18px auto; } .panel { padding: 14px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>USB HID keypad configurator</h1>
+  <p class="subtitle">Standalone Web Serial configurator. Работает в Chrome/Edge на desktop.</p>
+
+  <section class="panel">
+    <div class="toolbar">
+      <button id="connect">Подключить CDC</button>
+      <button id="disconnect" class="secondary" disabled>Отключить</button>
+      <button id="clearLog" class="secondary">Очистить лог</button>
+    </div>
+    <div class="status"><span id="dot" class="dot"></span><span id="status">Не подключено</span></div>
+    <p class="hint">Отключи keypad, зажми любую кнопку, подключи USB, затем нажми «Подключить CDC». В config mode HID-нажатия не отправляются.</p>
+    <p id="unsupported" class="hint unsupported" hidden>Этот браузер не поддерживает Web Serial API. Используй Chrome или Edge на desktop.</p>
+  </section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="panel">
+      <h2>Информация</h2>
+      <div class="actions">
+        <button id="info" class="secondary" disabled>Обновить info</button>
+      </div>
+      <pre id="infoOutput" class="mono" style="margin-top:12px">—</pre>
+    </section>
+    <section class="panel">
+      <h2>Debounce</h2>
+      <div class="toolbar">
+        <input id="debounceValue" type="number" min="1" max="255" value="4" style="width:100px">
+        <span>samples</span>
+        <button id="readDebounce" class="secondary" disabled>Прочитать</button>
+        <button id="setDebounce" disabled>Применить</button>
+      </div>
+      <p class="hint">При 2000 Гц: 4 samples ≈ 2 мс. Значение действует до перезагрузки.</p>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:16px">
+    <h2>Бинды</h2>
+    <table>
+      <thead><tr><th>Слот</th><th>GPIO</th><th>Клавиша</th></tr></thead>
+      <tbody id="bindings"></tbody>
+    </table>
+    <div class="actions" style="margin-top:16px">
+      <button id="readBindings" class="secondary" disabled>Прочитать</button>
+      <button id="save" disabled>Сохранить в NVS</button>
+      <button id="reset" class="danger" disabled>Сбросить defaults</button>
+    </div>
+    <p class="hint">Дубликаты разрешены: две физические кнопки могут иметь один HID-код.</p>
+  </section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="panel">
+      <h2>Тест кнопок</h2>
+      <div class="actions">
+        <button id="testOn" disabled>Включить test</button>
+        <button id="testOff" class="secondary" disabled>Выключить</button>
+      </div>
+      <p class="hint">Тест использует тот же timer 2000 Гц и integrator debounce, что и normal mode. События выводятся в лог CDC, HID не отправляет.</p>
+    </section>
+    <section class="panel">
+      <h2>Статистика</h2>
+      <div class="actions">
+        <button id="readStats" class="secondary" disabled>Прочитать</button>
+        <button id="clearStats" class="secondary" disabled>Очистить</button>
+      </div>
+      <pre id="statsOutput" class="mono" style="margin-top:12px">—</pre>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:16px">
+    <h2>Лог</h2>
+    <pre id="log" class="mono"></pre>
+  </section>
+</main>
+<script>
+(() => {
+  'use strict';
+
+  const bindings = [
+    { gpio: 4, key: 'Z' }, { gpio: 5, key: 'X' }, { gpio: 6, key: 'C' },
+    { gpio: 7, key: 'V' }, { gpio: 15, key: 'F13' }, { gpio: 16, key: 'F14' }
+  ];
+  const keys = [
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), ...'0123456789'.split(''),
+    ...Array.from({ length: 24 }, (_, i) => `F${i + 1}`),
+    'ENTER', 'ESC', 'TAB', 'SPACE', 'BACKSPACE', 'INSERT', 'DELETE',
+    'HOME', 'END', 'PAGEUP', 'PAGEDOWN', 'UP', 'DOWN', 'LEFT', 'RIGHT',
+    'CAPSLOCK', 'PRINTSCREEN', 'SCROLLLOCK', 'MENU', 'MUTE', 'VOLUP', 'VOLDN',
+    'CTRL', 'SHIFT', 'ALT', 'GUI', 'WIN', 'LCTRL', 'RCTRL', 'LSHIFT',
+    'RSHIFT', 'LALT', 'RALT', 'ALTGR', 'LWIN', 'RWIN', 'CMD'
+  ];
+
+  let port = null;
+  let reader = null;
+  let keepReading = false;
+  let receiveBuffer = '';
+  let pending = [];
+  let listing = false;
+
+  const $ = id => document.getElementById(id);
+  const log = (text, error = false) => {
+    const stamp = new Date().toLocaleTimeString();
+    $('log').textContent += `[${stamp}] ${text}\n`;
+    $('log').scrollTop = $('log').scrollHeight;
+    if (error) $('status').textContent = text;
+  };
+  const setConnected = connected => {
+    $('dot').classList.toggle('connected', connected);
+    $('status').textContent = connected ? 'Подключено' : 'Не подключено';
+    $('connect').disabled = connected;
+    $('disconnect').disabled = !connected;
+    document.querySelectorAll('button:not(#connect):not(#disconnect):not(#clearLog), input, select')
+      .forEach(el => { if (el.dataset.always !== 'true') el.disabled = !connected; });
+  };
+
+  function makeBindings() {
+    const body = $('bindings');
+    bindings.forEach((binding, slot) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${slot}</td><td>GPIO${binding.gpio}</td><td><select id="key-${slot}"></select></td>`;
+      const select = row.querySelector('select');
+      keys.forEach(key => {
+        const option = document.createElement('option');
+        option.value = key; option.textContent = key; select.appendChild(option);
+      });
+      select.value = binding.key;
+      body.appendChild(row);
+    });
+  }
+
+  async function readLoop() {
+    const decoder = new TextDecoderStream();
+    port.readable.pipeTo(decoder.writable).catch(() => {});
+    reader = decoder.readable.getReader();
+    keepReading = true;
+    try {
+      while (keepReading) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        receiveBuffer += value;
+        const lines = receiveBuffer.split(/\r?\n/);
+        receiveBuffer = lines.pop() || '';
+        lines.filter(line => line.length).forEach(handleLine);
+      }
+    } catch (error) {
+      if (keepReading) log(`ERR read ${error.message}`, true);
+    } finally {
+      reader.releaseLock(); reader = null;
+    }
+  }
+
+  function handleLine(line) {
+    log(`< ${line}`);
+    if (line.startsWith('OK') || line.startsWith('ERR')) {
+      const request = pending.shift();
+      if (request) request(line);
+    }
+    if (line.startsWith('OK info ')) $('infoOutput').textContent = line;
+    if (line.startsWith('OK stats ')) $('statsOutput').textContent = line;
+    if (line.startsWith('Current bindings:')) listing = true;
+    if (listing && line.startsWith('  slot ')) {
+      const match = line.match(/^  slot (\d+) -> ([^ ]+)/);
+      if (match && $('key-' + match[1])) $('key-' + match[1]).value = match[2];
+    }
+    if (listing && line.startsWith('OK ')) listing = false;
+    if (line.startsWith('OK debounce_samples=')) {
+      const value = line.match(/debounce_samples=(\d+)/)?.[1];
+      if (value) $('debounceValue').value = value;
+    }
+  }
+
+  async function send(command, wait = false) {
+    if (!port?.writable) throw new Error('CDC не подключён');
+    const writer = port.writable.getWriter();
+    try {
+      log(`> ${command}`);
+      if (wait) await new Promise(resolve => pending.push(() => resolve()));
+      await writer.write(new TextEncoder().encode(`${command}\n`));
+    } finally { writer.releaseLock(); }
+  }
+
+  async function command(command) {
+    if (!port?.writable) return;
+    await send(command);
+  }
+
+  async function connect() {
+    if (!('serial' in navigator)) { $('unsupported').hidden = false; return; }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      setConnected(true);
+      log('OK connected baud=115200');
+      readLoop();
+      // The firmware prints its banner on CDC attach. Request current state too.
+      setTimeout(() => { command('info'); command('list'); command('debounce'); }, 300);
+    } catch (error) { log(`ERR code=CONNECT_FAILED message=${error.message}`, true); }
+  }
+
+  async function disconnect() {
+    keepReading = false;
+    try { if (reader) await reader.cancel(); } catch (_) {}
+    try { if (port) await port.close(); } catch (_) {}
+    reader = null; port = null; pending = []; setConnected(false); log('OK disconnected');
+  }
+
+  $('connect').onclick = connect;
+  $('disconnect').onclick = disconnect;
+  $('clearLog').onclick = () => { $('log').textContent = ''; };
+  $('info').onclick = () => command('info');
+  $('readBindings').onclick = () => command('list');
+  $('save').onclick = () => command('save');
+  $('reset').onclick = async () => { await command('reset'); setTimeout(() => command('list'), 100); };
+  $('testOn').onclick = () => command('test on');
+  $('testOff').onclick = () => command('test off');
+  $('readStats').onclick = () => command('stats');
+  $('clearStats').onclick = () => command('stats clear');
+  $('readDebounce').onclick = () => command('debounce');
+  $('setDebounce').onclick = () => {
+    const value = Number($('debounceValue').value);
+    if (!Number.isInteger(value) || value < 1 || value > 255) {
+      log('ERR code=INVALID_VALUE debounce_range=1..255', true); return;
+    }
+    command(`debounce set ${value}`);
+  };
+
+  bindings.forEach((_, slot) => {
+    // Change handler is attached after the table is created below.
+  });
+  $('bindings').addEventListener('change', event => {
+    if (!event.target.matches('select')) return;
+    const slot = Number(event.target.id.split('-')[1]);
+    command(`bind ${slot} ${event.target.value}`);
+  });
+
+  if ('serial' in navigator) {
+    navigator.serial.addEventListener('disconnect', event => {
+      if (event.target === port) disconnect();
+    });
+  } else $('unsupported').hidden = false;
+
+  makeBindings(); setConnected(false);
+})();
+</script>
+</body>
+</html>
