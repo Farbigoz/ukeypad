@@ -60,7 +60,7 @@ hardware timer ISR (2000 Hz)
 
 ## Browser configurator
 
-The repository includes [web/configurator.html](web/configurator.html), a standalone
+The repository includes [docs/configurator.html](docs/configurator.html), a standalone
 GUI for the CDC configuration channel. It uses the browser's **Web Serial
 API** — no server, npm, Python, or external libraries are required.
 
@@ -73,14 +73,14 @@ serve the project directory locally, for example:
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000/web/` for the project page, or
-`http://localhost:8000/web/configurator.html` for the configurator.
+Then open `http://localhost:8000/docs/` for the project page, or
+`http://localhost:8000/docs/configurator.html` for the configurator.
 
 ### Usage
 
 1. Unplug the keypad.
 2. Hold **any one button** while connecting USB to enter config mode.
-3. Open `web/configurator.html` in Chrome/Edge.
+3. Open `docs/configurator.html` in Chrome/Edge.
 4. Click **Подключить CDC** and select the keypad's CDC COM port.
 5. Change key selectors; each change sends a `bind <slot> <key>` command.
 6. Click **Сохранить в NVS** to persist the new bindings.

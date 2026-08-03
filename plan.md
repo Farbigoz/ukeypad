@@ -23,7 +23,7 @@ Implemented today:
 - NVS-persisted key bindings;
 - text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `test`,
   `debounce`, `stats`, `help`;
-- standalone Web Serial GUI in [web/configurator.html](web/configurator.html);
+- standalone Web Serial GUI in [docs/configurator.html](docs/configurator.html);
 - HID state reset when USB stops/disconnects.
 
 ## Design principles
@@ -519,7 +519,7 @@ avoids partially applied settings after a disconnect.
 
 ## Phase 5 — Universal dynamic GUI
 
-Refactor [web/configurator.html](web/configurator.html) from a fixed six-row form into
+Refactor [docs/configurator.html](docs/configurator.html) from a fixed six-row form into
 a capability-driven UI.
 
 ### 5.1 Device discovery
