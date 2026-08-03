@@ -39,12 +39,12 @@ constexpr InputSlot INPUTS[] = {
 };
 #else
 constexpr InputSlot INPUTS[] = {
-    { 4,  InputType::Digital, HidKeycode::Z   },
-    { 5,  InputType::Digital, HidKeycode::X   },
-    { 6,  InputType::Digital, HidKeycode::C   },
-    { 7,  InputType::Digital, HidKeycode::V   },
-    { 15, InputType::Digital, HidKeycode::F13 },
-    { 16, InputType::Digital, HidKeycode::F14 },
+    { 1, InputType::Digital, HidKeycode::Z },
+    { 2, InputType::Digital, HidKeycode::X },
+    { 3, InputType::Digital, HidKeycode::C },
+    { 4, InputType::Digital, HidKeycode::V },
+    { 5, InputType::Digital, HidKeycode::S },
+    { 6, InputType::Digital, HidKeycode::D },
 };
 #endif
 

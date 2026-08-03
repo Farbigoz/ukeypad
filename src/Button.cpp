@@ -44,8 +44,9 @@ void Button::begin(uint8_t pin)
 // from the profile-defined scan ISR and must not depend on flash access.
 IRAM_ATTR ButtonEvent Button::update()
 {
-    // raw == true while the switch is physically actuated (pin pulled low).
-    const bool raw = (fastReadPin(_pin) == 0);
+    // fastReadPin() already returns true while the switch is physically
+    // actuated (pin pulled low).
+    const bool raw = fastReadPin(_pin);
 
     ButtonEvent event = ButtonEvent::None;
 

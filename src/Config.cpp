@@ -130,37 +130,31 @@ void Config::loadFromNvs() { const StorageResult result=loadBindings(*_keypad); 
 bool Config::saveToNvs() { return saveBindings(*_keypad)==StorageResult::Loaded; }
 
 
-void Config::processKeyEvents()
+void Config::processKeyEvent(const KeyEvent& event)
 {
-    if (!_configMode || !_keypad) return;
+    if (!_testMode) return;
 
-    KeyEvent event;
-    while (_keypad->getEvent(event)) {
-        if (!_testMode) {
-            // Config mode always consumes events, but never forwards them to
-            // HidKeyboard. This keeps the timer/debounce path identical to
-            // normal mode without generating host keypresses.
-            continue;
-        }
-
-        const uint8_t slotCode = static_cast<uint8_t>(event.keyCode);
-        Serial.print("OK test event=");
-        Serial.print(event.type == KeyEventType::Press ? "PRESS" : "RELEASE");
-        Serial.print(" key=0x");
-        if (slotCode < 0x10) Serial.print('0');
-        Serial.println(slotCode, HEX);
-    }
+    const uint8_t keyCode = static_cast<uint8_t>(event.keyCode);
+    Serial.print("OK test event=");
+    Serial.print(event.type == KeyEventType::Press ? "PRESS" : "RELEASE");
+    Serial.print(" key=0x");
+    if (keyCode < 0x10) Serial.print('0');
+    Serial.println(keyCode, HEX);
 }
 
 void Config::poll()
 {
-    if (!_configMode) return;
-
-    // Print the banner once a terminal is attached; re-show on reconnect.
-    if (Serial) {
-        if (!_bannerShown) {
-            printBanner();
-            _bannerShown = true;
+    // CDC commands are available in both modes. In normal mode this provides
+    // diagnostics and runtime configuration without changing HID event flow.
+    // The config-mode banner remains exclusive to config mode.
+    if (_configMode) {
+        if (Serial) {
+            if (!_bannerShown) {
+                printBanner();
+                _bannerShown = true;
+            }
+        } else {
+            _bannerShown = false;
         }
     } else {
         _bannerShown = false;

@@ -62,13 +62,13 @@ void setup()
     // Init buttons + load default bindings into the live table.
     g_keypad.begin();
 
-    // Boot mode: hold ANY switch while plugging in -> config mode (CDC
-    // command channel, HID output suppressed). Otherwise -> normal keyboard mode.
-    const bool configMode = g_keypad.anySwitchHeld();
+    // One unified operating mode: CDC configuration and HID output are
+    // available together. A held button no longer changes the boot behavior.
+    // Pass false so the old config-mode banner is not shown; Config::poll()
+    // still services the CDC command channel in this unified mode.
+    g_config.begin(g_keypad, false); // unified mode, not boot-selected config mode
 
-    // Load saved bindings from NVS (overrides defaults) in both modes, and
-    // prepare the Serial config interface if in config mode.
-    g_config.begin(g_keypad, configMode);
+    // The legacy boot gesture is intentionally no longer consulted.
 
     // Event semaphore (binary). Created before the timer starts so the ISR
     // never runs against a null handle.
@@ -88,30 +88,16 @@ void setup()
 
 void loop()
 {
-    if (g_config.isConfigMode()) {
-        // Config mode uses the same timer, GPIO scan and integrator debounce
-        // as normal mode. Consume every event here, but do not send it to HID.
-        g_config.processKeyEvents();
-        g_config.poll();
-        xSemaphoreTake(s_eventSem, pdMS_TO_TICKS(2));
-        g_config.processKeyEvents();
-        return;
-    }
+    // Unified mode: CDC commands, test events, and HID output are available
+    // at the same time. Configuration no longer suppresses keyboard reports.
+    g_config.poll();
 
-    // Normal mode: block until the scan ISR signals an event (or 2 ms safety
-    // timeout), then drain the queue into HID reports.
-    if (xSemaphoreTake(s_eventSem, pdMS_TO_TICKS(2)) == pdTRUE) {
-        KeyEvent ev;
-        while (g_keypad.getEvent(ev)) {
-            g_hid.handleEvent(ev);
-        }
-    } else {
-        // Timeout with no semaphore: defensively re-check the queue in case
-        // an event was queued but the "give" was lost (e.g. ISR fired while
-        // the semaphore was already full).
-        KeyEvent ev;
-        while (g_keypad.getEvent(ev)) {
-            g_hid.handleEvent(ev);
-        }
+    // Block until the scan ISR signals an event (or 2 ms safety timeout), then
+    // deliver every event to both the HID adapter and optional CDC test output.
+    xSemaphoreTake(s_eventSem, pdMS_TO_TICKS(2));
+    KeyEvent ev;
+    while (g_keypad.getEvent(ev)) {
+        g_hid.handleEvent(ev);
+        g_config.processKeyEvent(ev);
     }
 }

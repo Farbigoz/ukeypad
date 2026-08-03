@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "HidKeycode.h"
+#include "Keypad.h"
 
 class Keypad;
 
@@ -31,7 +32,7 @@ public:
 
     void begin(Keypad& keypad, bool configMode);
     void poll();
-    void processKeyEvents();
+    void processKeyEvent(const KeyEvent& event);
 
     bool isConfigMode() const { return _configMode; }
 
