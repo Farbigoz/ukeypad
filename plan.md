@@ -57,15 +57,15 @@ Implemented today:
 
 | Phase | Goal | Current status |
 |---|---|---|
-| 0 | Stabilize the current firmware | 0.1/0.2 complete; 0.3 and hardware checks pending |
-| 1 | Introduce compile-time device description | Profile foundation complete; multiple profiles and slot-aware events pending |
-| 2 | Add Hall-effect input support | Not started |
-| 3 | Support mixed input devices | Not started |
+| 0 | Stabilize the current firmware | Firmware foundation complete; hardware acceptance checks pending |
+| 1 | Introduce compile-time device description | Compile-time profile foundation complete; scalable HID support pending |
+| 2 | Expand digital profiles and scalable HID | Required now; current boot report supports only up to six non-modifier keys |
+| 3 | Build a descriptor-driven configurator | Not started |
 | 4 | Expose capabilities/configuration over CDC | Firmware description complete; GUI consumption pending |
-| 5 | Build a dynamic configurator | Not started |
-| 6 | Add configurable RGB lighting | Not started |
-| 7 | Verification and release hardening | Not started; hardware validation pending |
-| 8 | Add validated MCU backends | Not started |
+| 5 | Add configurable RGB lighting | Not started |
+| 6 | Verification and release hardening | Not started; hardware validation pending |
+| 7 | Add validated MCU backends | Not started |
+| 8 | Analog/Hall inputs | Deferred; intentionally out of current scope |
 
 ---
 
@@ -96,9 +96,9 @@ Implemented in `src/DeviceMetadata.*`, `src/Config.*`, and the configurator:
 - protocol and storage behavior documented in `README.md`.
 
 The configurator still uses a fixed six-slot layout. Dynamic descriptor-driven
-rendering belongs to Phase 5.
+rendering belongs to Phase 3.
 
-### 0.3 Diagnostics and recovery — partially complete
+### 0.3 Diagnostics and recovery — firmware foundation complete
 
 Implemented:
 
@@ -107,11 +107,13 @@ Implemented:
 - HID release/reset on USB stop/disconnect;
 - config mode consumes events without HID output.
 
-Pending:
+The firmware does not attempt to infer whether a held button is intentionally
+pressed or mechanically stuck. The existing config-mode boot gesture and the
+`test` command are sufficient ways to exercise the physical inputs; no separate
+stuck-key validation window is planned.
 
-- explicit user-command full HID release/reset;
-- boot-time validation window for a stuck key;
-- dedicated USB reconnect state/diagnostics beyond the current stop callback.
+No manual HID-reset command is required at this time: HID state is reset by the
+USB stop callback, and HID output is suppressed entirely in config mode.
 
 ### 0.4 Regression checklist — static checks complete, hardware pending
 
@@ -120,17 +122,20 @@ Completed in development:
 - PlatformIO build;
 - configurator JavaScript syntax check;
 - configurator HTML parse check;
-- diff/static review of the latency-critical path.
+- diff/static review of the latency-critical path;
+- implementation review of simultaneous keys and duplicate logical bindings;
+- implementation review of integrator debounce and USB-stop HID cleanup.
 
-Still requires real hardware:
+Still requires real hardware if release-level acceptance evidence is needed:
 
 - individual, simultaneous, duplicate, and modifier bindings;
-- USB disconnect while keys are held;
+- USB disconnect while keys are held, including reconnect behavior;
 - config-mode HID suppression;
 - NVS save/load/reset and corrupt-record fallback;
 - measured scan frequency, debounce timing, and end-to-end HID latency.
 
-Do not mark these hardware checks complete without testing the device.
+These are hardware acceptance checks, not missing firmware features. Do not mark
+them measured or complete without testing the device.
 
 ---
 
@@ -153,10 +158,11 @@ persisted.
 
 ## Phase 0 exit criteria
 
-Phase 0 is considered firmware-complete when sections 0.1 and 0.2 remain
-implemented, the pending 0.3 recovery commands are addressed, and the hardware
-regression checklist has been executed on the reference device. Static build
-checks alone do not constitute release validation.
+Phase 0 is firmware-complete: sections 0.1 and 0.2 are implemented, the 0.3
+diagnostics and recovery foundation is in place, and the static checks pass.
+Release validation additionally requires the hardware acceptance checklist on
+the reference device. Static build checks alone do not constitute hardware
+validation.
 
 ---
 
@@ -169,38 +175,83 @@ uses profile data for GPIOs, default bindings, input count, scan frequency,
 timer alarm derivation, debounce default, LED count, and capabilities. Safety
 checks cover reserved/unsafe GPIOs and duplicate pins.
 
-The phase is not complete because the project still has only one six-digital
-profile, the standard HID path is limited to six simultaneous non-modifier
-keys, and events do not yet carry a physical slot identifier.
+The compile-time profile foundation is complete. A profile is defined in
+`src/DeviceProfile.h`; its input count, GPIOs, input types, default bindings,
+timer parameters, debounce default, LED metadata, capabilities, and safety
+checks are consumed by the firmware without duplicating the current hardware
+values elsewhere. Creating another digital profile is a supported future use of
+this mechanism, but adding a second concrete profile is not required now.
+
+The current HID adapter still uses the standard boot keyboard path, whose
+six-key non-modifier rollover is an adapter limitation rather than a limitation
+of the physical profile model. The six-button configuration in the current
+profile is only one ready-to-use profile, not a firmware-wide six-button limit.
+Scalable HID is therefore already required before treating larger digital
+profiles as supported.
+
+`KeyEvent` currently carries the logical HID code rather than the physical slot.
+That is sufficient for the current HID path, including duplicate bindings. A
+physical slot field may be added later if physical-input diagnostics or mixed
+input handling requires it; it is not a Phase 1 blocker.
 
 ### Remaining work
 
-- add at least one additional digital profile, such as a two-input profile;
+- keep profile validation and safe-GPIO checks compile-time where possible;
+- replace the current six-key boot keyboard limitation with a scalable HID
+  report/backend so the ready-to-use six-button profile and future larger
+  digital profiles are not constrained by the boot-report rollover ceiling;
+- define profile selection/build integration when multiple concrete profiles
+  are needed, without copying runtime source files.
+
+---
+
+## Phase 2 — Digital profile scaling and scalable HID
+
+This phase replaces the previously planned Hall-input work in the active
+roadmap. Analog/Hall buttons are explicitly deferred and are not required for
+current releases.
+
+The current six-button configuration is a ready-to-use profile, not the target
+size of the firmware. The goal is to make the existing digital-button
+architecture support profiles with six or more physical inputs without changing
+the current profile semantics.
+
+### Planned work
+
+- add a second compile-time digital profile only when a concrete board requires
+  it, without copying runtime source files;
 - define profile selection through PlatformIO environments or a selected header;
-- keep each profile buildable without copying source files;
-- add `slot` to `KeyEvent` and preserve it through the queue for diagnostics and
-  future mixed input handling;
-- decide whether profiles larger than six require a custom HID report before
-  advertising ten-input support;
-- keep profile validation and safe-GPIO checks compile-time where possible.
+- replace the six-key boot keyboard limitation with a scalable HID report/backend
+  so profiles with six or more physical inputs can be supported without an
+  artificial six-key rollover ceiling;
+- keep profile validation, safe-GPIO checks, and input-count limits compile-time;
+- preserve the current logical `KeyEvent` model unless physical-slot identity is
+  required by a concrete feature.
 
 ---
 
-## Phase 2 — Hall-effect input support
+## Phase 3 — Descriptor-driven configurator
 
-Not started. First choose the supported sensor type and exact ESP32-S3 wiring
-before implementing ADC, digital Hall, or I2C/SPI support.
+The firmware-side device description protocol is already implemented. This phase
+makes the Web Serial GUI consume that descriptor instead of duplicating the
+currently selected compile-time profile.
 
----
+### Planned work
 
-## Phase 3 — Mixed digital and Hall inputs
-
-Not started. Depends on Phase 2 and the slot-aware common event model from
-Phase 1.
+- parse `get_device` and validate required descriptor fields;
+- render the input list, names, types, bindings, and available capabilities from
+  the device descriptor;
+- handle unsupported protocol versions and missing optional fields explicitly;
+- retain deterministic protocol error handling and a usable fallback message;
+- keep the GUI compatible with the current digital-input profile.
 
 ---
 
 ## Phase 4 — Device description and protocol
+
+The firmware-side description protocol is complete. This phase remains as the
+contract-maintenance phase for descriptor evolution while the GUI work is
+tracked in Phase 3.
 
 ### Current status
 
@@ -208,7 +259,7 @@ The firmware-side description protocol is complete: `info`, `get_device`,
 stable fields, framed multiline output, capabilities, GPIO metadata, and
 protocol version are implemented and documented.
 
-The remaining GUI work is tracked in Phase 5. Do not duplicate the firmware
+The remaining GUI work is tracked in Phase 3. Do not duplicate the firmware
 profile in the GUI when dynamic discovery is implemented.
 
 ### Remaining work
@@ -221,8 +272,8 @@ profile in the GUI when dynamic discovery is implemented.
 
 ## Phase 5 — Universal dynamic GUI
 
-Not started. Replace the fixed six-row form with descriptor-driven rendering
-only after the device description contract and slot metadata are stable.
+Superseded by Phase 3. Keep this heading as a historical roadmap reference;
+the active descriptor-driven GUI work is tracked in Phase 3.
 
 ---
 
@@ -248,9 +299,18 @@ backend before real USB, timing, storage, and (where applicable) ADC/DMA tests.
 
 ---
 
+## Deferred analog-input scope
+
+Analog/Hall inputs and mixed analog/digital profiles are intentionally deferred.
+They are retained only as a possible future extension and are not part of the
+active implementation sequence. No ADC, Hall calibration, hysteresis, DMA, or
+analog-input GUI work should be started until this scope is explicitly reopened.
+
+---
+
 ## Legacy roadmap detail
 
-The sections below retain design detail for Hall, mixed-input, GUI, RGB, and
+The sections below retain design detail for deferred analog inputs, RGB, GUI, and
 backend work. Their status is governed by the phase status above; examples using
 Hall inputs or LEDs are conceptual future examples, not current firmware output.
 
@@ -333,14 +393,10 @@ Keep this interface as future design guidance; it is not implemented yet.
 
 Resolve these before implementing the corresponding phase:
 
-- Which Hall sensor is the first supported hardware: analog voltage sensor,
-  digital Hall switch, or external I2C/SPI sensor?
-- Are Hall sensors connected directly to ESP32-S3 ADC pins, and which exact
-  SuperMini pins are available on the target PCB?
-- Is one timer scan pass sufficient for the maximum planned Hall channels, or is
-  ADC continuous/DMA mode needed?
-- Should profiles larger than six inputs use a custom HID report, or should the
-  first multi-profile release remain limited to six-key rollover?
+- When analog/Hall inputs are eventually reopened, which sensor, wiring, and
+  ADC/DMA sampling contract should be supported first?
+- Which scalable HID report format should support profiles larger than six
+  inputs while preserving ordinary keyboard compatibility?
 - Should the CDC protocol remain line-oriented text, or transition to framed
   JSON/binary only if capability discovery outgrows text?
 - What exact RGB hardware is planned, and what is the maximum LED current budget?
@@ -359,16 +415,22 @@ for context.
 
 ## Active next-iteration order
 
-1. Complete Phase 0.3 recovery commands and document their behavior.
-2. Add `slot` to `KeyEvent` and verify the current digital profile unchanged.
-3. Add and build a second digital profile, likely a two-input profile.
-4. Decide the HID report strategy for profiles larger than six inputs.
-5. Select the first Hall sensor and implement its isolated backend.
-6. Add calibration/hysteresis and then a mixed digital/Hall profile.
-7. Make the configurator consume `get_device` dynamically.
-8. Add RGB hardware abstraction only after input/profile capabilities are stable.
-9. Harden supported profiles and perform real hardware acceptance tests.
-10. Evaluate additional MCU backends only after the acceptance checklist passes.
+1. Keep the current digital firmware stable and document its existing
+   diagnostics and recovery behavior.
+2. Implement a scalable HID report/backend now; the current six-button profile
+   already establishes the need to support six or more physical inputs without
+   the boot-report rollover ceiling.
+3. Add and build a second compile-time digital profile when a concrete board
+   requires it.
+4. Make the configurator consume `get_device` dynamically.
+5. Add RGB hardware abstraction only after digital input/profile capabilities are
+   stable.
+6. Harden supported profiles and perform real hardware acceptance tests.
+7. Evaluate additional MCU backends only after the acceptance checklist passes.
+8. Keep analog/Hall and mixed analog/digital input work deferred until explicitly
+   reopened.
 
-This order reflects the actual repository state and avoids repeating completed
-NVS/protocol work.
+Creating additional compile-time profiles through `DeviceProfile.h` remains
+supported, but no second profile is required by the current iteration. This
+order reflects the actual repository state and avoids repeating completed
+NVS/protocol/profile-foundation work.

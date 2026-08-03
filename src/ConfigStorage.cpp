@@ -19,8 +19,11 @@ constexpr uint16_t CRC16_TOP_BIT = 0x8000;
 //   0..1  magic (little-endian "KP")
 //   2     format version
 //   3     payload length
-//   4..9  HID code for each physical slot
-//   10..11 CRC-16 over bytes 0..9
+//   4..(4 + KEY_COUNT - 1)  HID code for each physical slot
+//   following two bytes     CRC-16 over the header and binding payload
+//
+// The record is variable-sized: its payload length is the selected profile's
+// KEY_COUNT, while the versioned header and CRC remain fixed.
 //
 // Keep the record layout explicit and derived from KEY_COUNT. This makes a
 // change to the physical device size visible at compile time.

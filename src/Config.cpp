@@ -98,7 +98,7 @@ Config::Config()
 void Config::printBanner() const
 {
     Serial.println();
-    Serial.println("=== USB HID keypad — CONFIG MODE ===");
+    Serial.println("=== USB HID keypad ï¿½ CONFIG MODE ===");
     Serial.println("Hold any switch while plugging in to enter this mode.");
     Serial.println("Type 'help' for commands. Reboot (RESET) to play.");
     Serial.println();
@@ -269,7 +269,10 @@ void Config::handleLine()
         char* endp = nullptr;
         long slot = strtol(tok[1], &endp, 10);
         if (*endp != '\0' || slot < 0 || slot >= Keypad::KEY_COUNT) {
-            printError(ConfigError::InvalidSlot, "expected", "0..5");
+            Serial.print("ERR code=");
+            Serial.print(configErrorName(ConfigError::InvalidSlot));
+            Serial.print(" expected=0..");
+            Serial.println(Keypad::KEY_COUNT - 1);
             return;
         }
         HidKeycode code;

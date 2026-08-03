@@ -39,8 +39,8 @@ IRAM_ATTR uint8_t Keypad::scan()
         }
 
         // Lock-free SPSC enqueue. Single producer (this ISR) / single
-        // consumer (main loop). A 32-slot ring with only 6 keys can never
-        // fill in practice, but we still guard against overflow.
+        // consumer (main loop). The queue is intentionally independent of the
+        // selected profile size; overflow remains observable diagnostically.
         const uint8_t next = static_cast<uint8_t>((_head + 1) & QUEUE_MASK);
         if (next == _tail) {
             // Queue full: drop this event. Keep a diagnostic counter.

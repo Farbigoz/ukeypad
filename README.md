@@ -1,9 +1,10 @@
 # ukeypad
 
 A general-purpose USB HID keypad for games, shortcuts, macros, media control,
-accessibility, testing, and custom input workflows. The current reference
-profile targets six mechanical switches on an ESP32-S3 SuperMini and uses the
-Arduino framework with the ESP32 core's TinyUSB stack.
+accessibility, testing, and custom input workflows. The repository includes a
+ready-to-use six-input digital profile for an ESP32-S3 SuperMini and uses the
+Arduino framework with the ESP32 core's TinyUSB stack. The firmware model allows
+compile-time digital profiles with up to 32 inputs.
 
 The roadmap for compile-time profiles, Hall inputs, capability discovery, and
 RGB output is documented in [plan.md](plan.md).
@@ -48,7 +49,9 @@ profile-defined hardware timer ISR
   (currently 4), approximately 2 ms at the current scan rate.
 - `debounce set N` changes the active threshold until reboot; debounce is not
   persisted in NVS.
-- The current USB keyboard report supports six simultaneous non-modifier keys.
+- The current USB keyboard report supports six simultaneous non-modifier keys;
+this is a HID report limitation, not a limit on the number of physical inputs
+in a compile-time profile.
 
 ### Layering
 
@@ -184,9 +187,9 @@ versioned record:
 |---:|---:|---|
 | 0 | 2 | magic `0x4B50` (`KP`, little-endian) |
 | 2 | 1 | record version from `FirmwareVersion.h` |
-| 3 | 1 | payload length (`6` for the current profile) |
-| 4 | 6 | one HID usage byte per slot |
-| 10 | 2 | CRC-16/CCITT over bytes 0..9, little-endian |
+| 3 | 1 | payload length (`input_count` for the selected profile) |
+| 4 | `input_count` | one HID usage byte per slot |
+| `4 + input_count` | 2 | CRC-16/CCITT over the header and binding payload, little-endian |
 
 The firmware deliberately does not read or migrate the old raw six-byte format.
 Missing, truncated, unknown-version, corrupt, or invalid records leave the

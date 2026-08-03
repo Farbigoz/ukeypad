@@ -87,7 +87,9 @@ void printBindings(const Keypad& keypad, Print& out)
 void printHelp(Print& out)
 {
     out.println("Commands:");
-    out.println("  bind <slot> <key>   set slot (0..5) to a key");
+    out.print("  bind <slot> <key>   set slot (0..");
+    out.print(Keypad::KEY_COUNT - 1);
+    out.println(") to a key");
     out.println("  list                show current bindings");
     out.println("  save                write bindings to flash (NVS)");
     out.println("  reset               restore defaults (RAM; 'save' to keep)");
