@@ -15,11 +15,13 @@ mechanical switches:
 - GPIO15 → F13
 - GPIO16 → F14
 
-The hardware profile is defined in [src/DeviceProfile.h](src/DeviceProfile.h).
+The hardware profiles are defined in [src/DeviceProfile.h](src/DeviceProfile.h).
+The default reference profile has six inputs; a selectable eight-input
+compile-time validation profile is also defined through `platformio.ini`.
 Do not duplicate model, GPIO, default binding, scan, debounce, LED, or
 capability values in runtime code or documentation. Future work is described
-in [plan.md](plan.md): variable compile-time profiles, Hall inputs, capability
-discovery, RGB output, and validated MCU backends.
+in [plan.md](plan.md): Hall inputs, RGB output, release hardening, and validated
+MCU backends.
 
 ## Common commands
 
@@ -150,9 +152,10 @@ not supported or migrated. Debounce changes are runtime-only.
 ## Web configurator
 
 `docs/configurator.html` uses Web Serial and requires a Chromium desktop browser
-(Chrome/Edge). It expects config mode. When protocol responses change, update the
-GUI parser and README together. The GUI currently has a fixed six-slot layout;
-dynamic capability-driven rendering is a later phase.
+(Chrome/Edge). It expects config mode and reads `get_device` before rendering
+profile-sized binding rows. When protocol responses change, update the GUI parser
+and README together. The GUI must not duplicate profile GPIOs, input counts, or
+input types.
 
 ## Platform expansion rules
 

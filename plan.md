@@ -58,10 +58,10 @@ Implemented today:
 | Phase | Goal | Current status |
 |---|---|---|
 | 0 | Stabilize the current firmware | Firmware foundation complete; hardware acceptance checks pending |
-| 1 | Introduce compile-time device description | Compile-time profile foundation complete; scalable HID support pending |
-| 2 | Expand digital profiles and scalable HID | Required now; current boot report supports only up to six non-modifier keys |
-| 3 | Build a descriptor-driven configurator | Not started |
-| 4 | Expose capabilities/configuration over CDC | Firmware description complete; GUI consumption pending |
+| 1 | Introduce compile-time device description | Complete; profile-sized validation and build selection are implemented |
+| 2 | Expand digital profiles and scalable HID | Digital profile scaling complete; scalable HID deferred until 7+ simultaneous keys are required |
+| 3 | Build a descriptor-driven configurator | Complete; GUI consumes `get_device` and renders profile-sized bindings |
+| 4 | Expose capabilities/configuration over CDC | Firmware descriptor complete; ongoing contract maintenance only |
 | 5 | Add configurable RGB lighting | Not started |
 | 6 | Verification and release hardening | Not started; hardware validation pending |
 | 7 | Add validated MCU backends | Not started |
@@ -95,8 +95,8 @@ Implemented in `src/DeviceMetadata.*`, `src/Config.*`, and the configurator:
 - explicit `OK list` terminator;
 - protocol and storage behavior documented in `README.md`.
 
-The configurator still uses a fixed six-slot layout. Dynamic descriptor-driven
-rendering belongs to Phase 3.
+The configurator now uses descriptor-driven rendering; it no longer duplicates
+or assumes the six-input reference profile.
 
 ### 0.3 Diagnostics and recovery — firmware foundation complete
 
@@ -179,15 +179,13 @@ The compile-time profile foundation is complete. A profile is defined in
 `src/DeviceProfile.h`; its input count, GPIOs, input types, default bindings,
 timer parameters, debounce default, LED metadata, capabilities, and safety
 checks are consumed by the firmware without duplicating the current hardware
-values elsewhere. Creating another digital profile is a supported future use of
-this mechanism, but adding a second concrete profile is not required now.
+values elsewhere. The firmware currently allows up to 32 digital inputs and
+includes a selectable eight-input build-validation profile in `platformio.ini`.
 
 The current HID adapter still uses the standard boot keyboard path, whose
 six-key non-modifier rollover is an adapter limitation rather than a limitation
-of the physical profile model. The six-button configuration in the current
-profile is only one ready-to-use profile, not a firmware-wide six-button limit.
-Scalable HID is therefore already required before treating larger digital
-profiles as supported.
+of the physical profile model. Scalable HID is intentionally deferred until
+support for seven or more simultaneous ordinary keys becomes a real requirement.
 
 `KeyEvent` currently carries the logical HID code rather than the physical slot.
 That is sufficient for the current HID path, including duplicate bindings. A
@@ -196,54 +194,49 @@ input handling requires it; it is not a Phase 1 blocker.
 
 ### Remaining work
 
-- keep profile validation and safe-GPIO checks compile-time where possible;
-- replace the current six-key boot keyboard limitation with a scalable HID
-  report/backend so the ready-to-use six-button profile and future larger
-  digital profiles are not constrained by the boot-report rollover ceiling;
-- define profile selection/build integration when multiple concrete profiles
-  are needed, without copying runtime source files.
+- keep profile validation and safe-GPIO checks compile-time as profiles evolve;
+- add additional concrete profiles only when a validated board/wiring target is
+  available;
+- revisit scalable HID only if the project requires seven or more simultaneous
+  ordinary keys.
 
 ---
 
 ## Phase 2 — Digital profile scaling and scalable HID
 
-This phase replaces the previously planned Hall-input work in the active
-roadmap. Analog/Hall buttons are explicitly deferred and are not required for
-current releases.
+This phase is complete for the current digital-profile scope. Analog/Hall
+buttons are explicitly deferred and are not required for current releases.
 
-The current six-button configuration is a ready-to-use profile, not the target
-size of the firmware. The goal is to make the existing digital-button
-architecture support profiles with six or more physical inputs without changing
-the current profile semantics.
+Implemented:
 
-### Planned work
+- profile-sized digital input model with a maximum of 32 inputs;
+- automatic compile-time safe-GPIO and duplicate-GPIO validation;
+- profile-sized binding storage and device metadata;
+- selectable eight-input build-validation profile;
+- shared runtime sources across profile environments.
 
-- add a second compile-time digital profile only when a concrete board requires
-  it, without copying runtime source files;
-- define profile selection through PlatformIO environments or a selected header;
-- replace the six-key boot keyboard limitation with a scalable HID report/backend
-  so profiles with six or more physical inputs can be supported without an
-  artificial six-key rollover ceiling;
-- keep profile validation, safe-GPIO checks, and input-count limits compile-time;
-- preserve the current logical `KeyEvent` model unless physical-slot identity is
-  required by a concrete feature.
+Scalable HID is not part of the completed work. The current boot keyboard report
+still limits simultaneous ordinary keys to six; this is acceptable until a
+7+ simultaneous-key requirement appears.
 
 ---
 
 ## Phase 3 — Descriptor-driven configurator
 
-The firmware-side device description protocol is already implemented. This phase
-makes the Web Serial GUI consume that descriptor instead of duplicating the
-currently selected compile-time profile.
+The firmware-side device description protocol and descriptor-driven Web Serial
+GUI are implemented. The GUI consumes `get_device` rather than duplicating a
+specific compile-time profile.
 
-### Planned work
+### Current status
 
-- parse `get_device` and validate required descriptor fields;
-- render the input list, names, types, bindings, and available capabilities from
-  the device descriptor;
-- handle unsupported protocol versions and missing optional fields explicitly;
-- retain deterministic protocol error handling and a usable fallback message;
-- keep the GUI compatible with the current digital-input profile.
+- parses and validates the framed `get_device` response;
+- renders the binding table from descriptor input count, types, and GPIO pins;
+- applies `list` responses to dynamically created rows;
+- clears profile-specific UI state on disconnect or invalid descriptors;
+- handles the current six-input and selectable eight-input digital profiles.
+
+Further protocol/version evolution and richer configuration transactions remain
+future work.
 
 ---
 
@@ -259,14 +252,14 @@ The firmware-side description protocol is complete: `info`, `get_device`,
 stable fields, framed multiline output, capabilities, GPIO metadata, and
 protocol version are implemented and documented.
 
-The remaining GUI work is tracked in Phase 3. Do not duplicate the firmware
-profile in the GUI when dynamic discovery is implemented.
+The GUI work is complete in Phase 3. Future descriptor changes must remain
+backward-compatible or be handled explicitly by the GUI.
 
 ### Remaining work
 
-- define how the GUI handles unsupported protocol versions;
-- define required versus optional descriptor fields;
-- add a current-configuration descriptor when transaction support is designed.
+- define how future descriptor revisions handle unsupported protocol versions;
+- define required versus optional fields as the descriptor evolves;
+- add a current-configuration descriptor only when transaction support is designed.
 
 ---
 

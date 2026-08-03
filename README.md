@@ -65,9 +65,12 @@ in a compile-time profile.
 
 ## Browser configurator
 
-[docs/configurator.html](docs/configurator.html) is a dependency-free Web Serial
-GUI for the CDC configuration channel. It requires a current desktop Chrome or
-Edge browser. Web Serial generally is not available in Firefox or Safari.
+[docs/configurator.html](docs/configurator.html) is a dependency-free,
+descriptor-driven Web Serial GUI for the CDC configuration channel. It reads
+`get_device` and creates binding rows from the selected firmware profile; it does
+not duplicate profile GPIOs or input counts. It requires a current desktop
+Chrome or Edge browser. Web Serial generally is not available in Firefox or
+Safari.
 
 The page can be opened directly in Chrome/Edge or served locally:
 
@@ -180,8 +183,8 @@ Unknown fields should be ignored by clients.
 
 ### NVS storage format
 
-Bindings are stored under namespace `ukeypad`, key `bindings`, as a 12-byte
-versioned record:
+Bindings are stored under namespace `ukeypad`, key `bindings`, as a
+profile-sized versioned record:
 
 | Offset | Size | Field |
 |---:|---:|---|
@@ -236,9 +239,12 @@ Hardware behavior has not been validated unless the device was actually tested.
 
 ## Future development
 
-- Compile-time two-, six-, and ten-input profiles.
-- Hall-effect input backend, calibration, hysteresis, and Rapid Trigger.
-- Capability-driven configurator UI.
+- Additional validated compile-time digital profiles when concrete hardware
+  targets are available.
+- Scalable HID only if support for seven or more simultaneous ordinary keys is
+  required; the current report supports six simultaneous non-modifier keys.
+- Hall-effect input backend, calibration, hysteresis, and Rapid Trigger; this is
+  intentionally deferred and not part of the current digital-input scope.
 - RGB output through ESP32-S3 RMT, outside the scan ISR.
 - Atomic configuration transactions.
 - Validated additional MCU backends.
