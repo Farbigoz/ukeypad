@@ -37,6 +37,8 @@ pio device monitor
 python -c "import re; s=open('docs/configurator.html',encoding='utf-8').read(); m=re.search(r'<script>(.*?)</script>',s,re.S); open('.configurator-check.js','w',encoding='utf-8').write(m.group(1))"
 node --check .configurator-check.js
 rm .configurator-check.js
+python tools/build_configurator.py
+python tools/build_configurator.py --check
 python -c "from html.parser import HTMLParser; HTMLParser().feed(open('docs/configurator.html',encoding='utf-8').read()); print('HTML parsed')"
 
 git status --short --branch
@@ -60,7 +62,9 @@ TinyUSB and composite CDC+HID (`ARDUINO_USB_MODE=0`,
 - `src/DeviceMetadata.*` — machine-readable CDC output.
 - `src/KeyNameTable.*` — HID name lookup.
 - `docs/index.html` — GitHub Pages landing page.
-- `docs/configurator.html` — standalone Web Serial GUI.
+- `docs/configurator.html` — generated standalone Web Serial GUI; do not edit directly.
+- `docs/src/configurator/` — editable configurator template, CSS, and JavaScript sources (including `js/` fragments).
+- `tools/build_configurator.py` — offline standard-library configurator bundler.
 - `platformio.ini` — PlatformIO environment.
 - `README.md` — build, wiring, protocol, and verification notes.
 - `plan.md` — roadmap and design decisions.
@@ -117,15 +121,18 @@ newer timer API without checking the installed framework headers and rebuilding.
 use `digitalRead()` for compatibility with the installed core; preserve this
 unless a measured performance issue justifies a platform-specific backend.
 
-## Normal and config modes
+## Unified operating mode
 
-Both modes use the same profile-defined timer, GPIO scan, integrator debounce,
-and event queue:
+The firmware uses one operating mode. The profile-defined timer, GPIO scan,
+integrator debounce, event queue, HID output, and CDC command channel are
+active together:
 
-- **Normal mode:** events are forwarded to `HidKeyboard`; CDC commands are inert.
-- **Config mode:** hold any switch during boot; events are consumed by
-  `Config::processKeyEvents()` and never reach HID. With `test on`, debounced
-events are printed over CDC.
+- button events are forwarded to `HidKeyboard`;
+- CDC commands remain available without a boot gesture;
+- `test on` additionally prints debounced events over CDC without suppressing
+  HID output.
+
+There is no separate config-mode boot gesture.
 
 The CDC protocol is line-oriented and case-insensitive. Current commands:
 
@@ -152,10 +159,15 @@ not supported or migrated. Debounce changes are runtime-only.
 ## Web configurator
 
 `docs/configurator.html` uses Web Serial and requires a Chromium desktop browser
-(Chrome/Edge). It expects config mode and reads `get_device` before rendering
-profile-sized binding rows. When protocol responses change, update the GUI parser
-and README together. The GUI must not duplicate profile GPIOs, input counts, or
-input types.
+(Chrome/Edge). It reads `get_device` before rendering profile-sized binding rows.
+When protocol responses change, update the GUI parser and README together. The
+GUI must not duplicate profile GPIOs, input counts, or input types.
+
+Edit the source fragments under `docs/src/configurator/`, then regenerate the
+committed standalone artifact with `python tools/build_configurator.py`. Run
+`python tools/build_configurator.py --check` before committing. The generated
+HTML must remain dependency-free and usable directly through `file://`; do not
+hand-edit it.
 
 ## Platform expansion rules
 

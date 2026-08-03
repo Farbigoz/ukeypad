@@ -72,6 +72,19 @@ not duplicate profile GPIOs or input counts. It requires a current desktop
 Chrome or Edge browser. Web Serial generally is not available in Firefox or
 Safari.
 
+The committed HTML is generated from the editable sources in
+`docs/src/configurator/`, including the JavaScript fragments under
+`docs/src/configurator/js/`. Regenerate it after source changes with:
+
+```bash
+python tools/build_configurator.py
+python tools/build_configurator.py --check
+```
+
+The bundler uses only the Python standard library and embeds the CSS and
+JavaScript directly into the output, so the generated file remains usable
+offline through `file://` with no external runtime dependencies.
+
 The page can be opened directly in Chrome/Edge or served locally:
 
 ```bash
@@ -216,9 +229,12 @@ ukeypad/
 │   ├── ConfigStorage.h/.cpp  # versioned NVS records
 │   ├── DeviceMetadata.h/.cpp # protocol output
 │   └── KeyNameTable.h/.cpp   # HID name lookup
-└── docs/
-    ├── index.html
-    └── configurator.html
+├── docs/
+│   ├── index.html
+│   ├── configurator.html       # generated standalone configurator
+│   └── src/configurator/       # editable configurator sources
+└── tools/
+    └── build_configurator.py   # offline Python bundler
 ```
 
 ## Measuring latency

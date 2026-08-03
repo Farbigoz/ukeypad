@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USB HID keypad configurator</title>
+  <!-- __STYLE__ -->
+</head>
+<body>
+<main>
+  <h1>USB HID keypad configurator</h1>
+  <p class="subtitle">Standalone Web Serial configurator. Работает в Chrome/Edge на desktop.</p>
+
+  <section class="panel">
+    <div class="toolbar">
+      <button id="connect">Подключить CDC</button>
+      <button id="disconnect" class="secondary" disabled>Отключить</button>
+      <button id="clearLog" class="secondary">Очистить лог</button>
+    </div>
+    <div class="status"><span id="dot" class="dot"></span><span id="status">Не подключено</span></div>
+    <p class="hint">Отключи keypad, зажми любую кнопку, подключи USB, затем нажми «Подключить CDC». В config mode HID-нажатия не отправляются.</p>
+    <p id="unsupported" class="hint unsupported" hidden>Этот браузер не поддерживает Web Serial API. Используй Chrome или Edge на desktop.</p>
+  </section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="panel">
+      <h2>Информация</h2>
+      <div class="actions">
+        <button id="info" class="secondary" disabled>Обновить info</button>
+        <button id="getDevice" class="secondary" disabled>Описание устройства</button>
+      </div>
+      <div id="infoOutput" class="info-grid">
+        <span class="info-label">Модель</span><span class="info-value" id="infoModel">—</span>
+        <span class="info-label">Прошивка</span><span class="info-value" id="infoFirmware">—</span>
+        <span class="info-label">Протокол</span><span class="info-value" id="infoProtocol">—</span>
+        <span class="info-label">Формат NVS</span><span class="info-value" id="infoConfigVersion">—</span>
+        <span class="info-label">Входы</span><span class="info-value" id="infoInputs">—</span>
+        <span class="info-label">Светодиоды</span><span class="info-value" id="infoLeds">—</span>
+        <span class="info-label">Сканирование</span><span class="info-value" id="infoScan">—</span>
+        <span class="info-label">USB</span><span class="info-value" id="infoUsb">—</span>
+        <span class="info-label">Возможности</span><span class="info-value" id="infoCapabilities">—</span>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Debounce</h2>
+      <div class="toolbar">
+        <input id="debounceValue" type="number" min="1" max="255" value="4" style="width:100px">
+        <span>samples</span>
+        <button id="readDebounce" class="secondary" disabled>Прочитать</button>
+        <button id="setDebounce" disabled>Применить</button>
+      </div>
+      <p class="hint">При 2000 Гц: 4 samples ≈ 2 мс. Значение действует до перезагрузки.</p>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:16px">
+    <h2>Бинды</h2>
+    <table>
+      <thead><tr><th>Слот</th><th>Тип</th><th>GPIO</th><th>Клавиша</th></tr></thead>
+      <tbody id="bindings"></tbody>
+    </table>
+    <div class="actions" style="margin-top:16px">
+      <button id="readBindings" class="secondary" disabled>Прочитать</button>
+      <button id="save" disabled>Сохранить в NVS</button>
+      <button id="reset" class="danger" disabled>Сбросить defaults</button>
+    </div>
+    <p class="hint">Дубликаты разрешены: две физические кнопки могут иметь один HID-код.</p>
+  </section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="panel">
+      <h2>Тест кнопок</h2>
+      <div class="actions">
+        <button id="testOn" disabled>Включить test</button>
+        <button id="testOff" class="secondary" disabled>Выключить</button>
+      </div>
+      <p class="hint">Тест использует тот же timer 2000 Гц и integrator debounce, что и normal mode. События появляются в отдельном поле, HID не отправляет.</p>
+    </section>
+    <section class="panel">
+      <h2>Статистика</h2>
+      <div class="actions">
+        <button id="readStats" class="secondary" disabled>Прочитать</button>
+        <button id="clearStats" class="secondary" disabled>Очистить</button>
+      </div>
+      <div class="stats-grid" aria-live="polite">
+        <div class="stat-tile"><div class="stat-value" id="statsScan">—</div><div class="stat-label">Сканов</div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsEvents">—</div><div class="stat-label">Событий</div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsOverflow">—</div><div class="stat-label">Переполнений</div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsQueue">—</div><div class="stat-label">Пик очереди</div></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:16px">
+    <div class="toolbar">
+      <h2 style="margin:0; flex:1">События кнопок</h2>
+      <label class="hint" style="margin:0"><input id="autoScrollEvents" type="checkbox" checked> автопрокрутка</label>
+      <button id="clearEvents" class="secondary">Очистить</button>
+    </div>
+    <div id="events" class="events mono empty-state" aria-live="polite">Включите test и нажмите кнопку.</div>
+  </section>
+
+  <details class="panel" style="margin-top:16px">
+    <summary>Технический лог CDC</summary>
+    <pre id="log" class="mono"></pre>
+  </details>
+</main>
+<!-- __SCRIPT__ -->
+</body>
+</html>
