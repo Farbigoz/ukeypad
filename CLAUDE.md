@@ -34,12 +34,12 @@ pio run -t upload
 pio run -t upload --upload-port COMx
 pio device monitor
 
-python -c "import re; s=open('docs/configurator.html',encoding='utf-8').read(); m=re.search(r'<script>(.*?)</script>',s,re.S); open('.configurator-check.js','w',encoding='utf-8').write(m.group(1))"
+python -c "import re; s=open('utils/configurator.html',encoding='utf-8').read(); m=re.search(r'<script>(.*?)</script>',s,re.S); open('.configurator-check.js','w',encoding='utf-8').write(m.group(1))"
 node --check .configurator-check.js
 rm .configurator-check.js
 python tools/build_configurator.py
 python tools/build_configurator.py --check
-python -c "from html.parser import HTMLParser; HTMLParser().feed(open('docs/configurator.html',encoding='utf-8').read()); print('HTML parsed')"
+python -c "from html.parser import HTMLParser; HTMLParser().feed(open('utils/configurator.html',encoding='utf-8').read()); print('HTML parsed')"
 
 git status --short --branch
 ```
@@ -61,15 +61,15 @@ TinyUSB and composite CDC+HID (`ARDUINO_USB_MODE=0`,
 - `src/ConfigStorage.*` — versioned NVS binding records and CRC validation.
 - `src/DeviceMetadata.*` — machine-readable CDC output.
 - `src/KeyNameTable.*` — HID name lookup.
-- `docs/index.html` — GitHub Pages landing page.
-- `docs/configurator.html` — generated standalone Web Serial GUI; do not edit directly.
-- `docs/src/configurator/` — editable configurator template, CSS, and JavaScript sources (including `js/` fragments).
+- `index.html` — GitHub Pages landing page.
+- `utils/configurator.html` — generated standalone Web Serial GUI; do not edit directly.
+- `utils/src/configurator/` — editable configurator template, CSS, and JavaScript sources (including `js/` fragments).
 - `tools/build_configurator.py` — offline standard-library configurator bundler.
 - `platformio.ini` — PlatformIO environment.
 - `README.md` — build, wiring, protocol, and verification notes.
 - `plan.md` — roadmap and design decisions.
 
-GitHub Pages uses `master` and `/docs`; keep links inside `docs/` relative.
+GitHub Pages should use `master` and the repository root; keep links relative to the repository root.
 
 ## Firmware architecture
 
@@ -158,12 +158,12 @@ not supported or migrated. Debounce changes are runtime-only.
 
 ## Web configurator
 
-`docs/configurator.html` uses Web Serial and requires a Chromium desktop browser
+`utils/configurator.html` uses Web Serial and requires a Chromium desktop browser
 (Chrome/Edge). It reads `get_device` before rendering profile-sized binding rows.
 When protocol responses change, update the GUI parser and README together. The
 GUI must not duplicate profile GPIOs, input counts, or input types.
 
-Edit the source fragments under `docs/src/configurator/`, then regenerate the
+Edit the source fragments under `utils/src/configurator/`, then regenerate the
 committed standalone artifact with `python tools/build_configurator.py`. Run
 `python tools/build_configurator.py --check` before committing. The generated
 HTML must remain dependency-free and usable directly through `file://`; do not

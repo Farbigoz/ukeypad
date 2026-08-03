@@ -22,7 +22,7 @@ JS_FILES = (
 
 STYLE_MARKER = "<!-- __STYLE__ -->"
 SCRIPT_MARKER = "<!-- __SCRIPT__ -->"
-PROVENANCE = "<!-- Generated from docs/src/configurator/; edit sources, not this file. -->"
+PROVENANCE = "<!-- Generated from utils/src/configurator/; edit sources, not this file. -->"
 
 
 class ValidationParser(HTMLParser):
@@ -87,8 +87,8 @@ def validate(output: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--src", type=Path, default=Path("docs/src/configurator"))
-    parser.add_argument("--out", type=Path, default=Path("docs/configurator.html"))
+    parser.add_argument("--src", type=Path, default=Path("utils/src/configurator"))
+    parser.add_argument("--out", type=Path, default=Path("utils/configurator.html"))
     parser.add_argument("--check", action="store_true", help="fail if the committed output is stale")
     parser.add_argument("--no-validate", action="store_true", help="skip HTML and JavaScript validation")
     args = parser.parse_args()

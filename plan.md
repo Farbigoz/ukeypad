@@ -23,7 +23,7 @@ Implemented today:
 - NVS-persisted key bindings;
 - text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `test`,
   `debounce`, `stats`, `help`;
-- standalone Web Serial GUI in [docs/configurator.html](docs/configurator.html);
+- standalone Web Serial GUI in [utils/configurator.html](utils/configurator.html);
 - centralized compile-time profile in `src/DeviceProfile.h`;
 - centralized firmware/protocol/storage versions in `src/FirmwareVersion.h`;
 - separated `ConfigStorage`, `DeviceMetadata`, and `KeyNameTable` modules;

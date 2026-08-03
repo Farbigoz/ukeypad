@@ -65,7 +65,7 @@ in a compile-time profile.
 
 ## Browser configurator
 
-[docs/configurator.html](docs/configurator.html) is a dependency-free,
+[utils/configurator.html](utils/configurator.html) is a dependency-free,
 descriptor-driven Web Serial GUI for the CDC configuration channel. It reads
 `get_device` and creates binding rows from the selected firmware profile; it does
 not duplicate profile GPIOs or input counts. It requires a current desktop
@@ -73,8 +73,8 @@ Chrome or Edge browser. Web Serial generally is not available in Firefox or
 Safari.
 
 The committed HTML is generated from the editable sources in
-`docs/src/configurator/`, including the JavaScript fragments under
-`docs/src/configurator/js/`. Regenerate it after source changes with:
+`utils/src/configurator/`, including the JavaScript fragments under
+`utils/src/configurator/js/`. Regenerate it after source changes with:
 
 ```bash
 python tools/build_configurator.py
@@ -91,8 +91,8 @@ The page can be opened directly in Chrome/Edge or served locally:
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000/docs/` or
-`http://localhost:8000/docs/configurator.html`.
+Then open `http://localhost:8000/` or
+`http://localhost:8000/utils/configurator.html`.
 
 ### Usage
 
@@ -229,8 +229,8 @@ ukeypad/
 │   ├── ConfigStorage.h/.cpp  # versioned NVS records
 │   ├── DeviceMetadata.h/.cpp # protocol output
 │   └── KeyNameTable.h/.cpp   # HID name lookup
-├── docs/
-│   ├── index.html
+├── index.html
+├── utils/
 │   ├── configurator.html       # generated standalone configurator
 │   └── src/configurator/       # editable configurator sources
 └── tools/
