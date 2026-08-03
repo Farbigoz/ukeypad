@@ -135,9 +135,11 @@
   let keepReading = false;
   let receiveBuffer = '';
   let pending = [];
+  let commandChain = Promise.resolve();
   let listing = false;
   let descriptor = null;
   let descriptorFrame = null;
+  const currentBindings = new Map();
 
   function parseFields(line) {
     const fields = {};
@@ -199,12 +201,15 @@
         option.value = key; option.textContent = key; select.appendChild(option);
       });
       body.appendChild(row);
+      const binding = currentBindings.get(slot);
+      if (binding && keys.includes(binding)) select.value = binding;
     });
   }
 
   function clearDescriptor() {
     descriptor = null;
     descriptorFrame = null;
+    currentBindings.clear();
     $('bindings').replaceChildren();
   }
 
@@ -251,30 +256,61 @@
     if (line.startsWith('OK info ')) $('infoOutput').textContent = line;
     if (line.startsWith('OK stats ')) $('statsOutput').textContent = line;
     if (line.startsWith('Current bindings:')) listing = true;
-    if (listing && line.startsWith('  slot ')) {
-      const match = line.match(/^  slot (\d+) -> ([^ ]+)/);
-      if (match && $('key-' + match[1])) $('key-' + match[1]).value = match[2];
+    if (listing && line.match(/^\s*slot /)) {
+      const match = line.match(/^\s*slot (\d+) -> ([^ ]+)/);
+      if (match) {
+        const slot = Number(match[1]);
+        const binding = match[2];
+        currentBindings.set(slot, binding);
+        const select = $('key-' + slot);
+        if (select && keys.includes(binding)) select.value = binding;
+      }
     }
     if (listing && line === 'OK list') listing = false;
     if (line.startsWith('OK debounce_samples=')) {
       const value = line.match(/debounce_samples=(\d+)/)?.[1];
       if (value) $('debounceValue').value = value;
     }
-    if (line === 'OK device_end' || line === 'OK list' ||
-        (line.startsWith('OK ') && !line.startsWith('OK device_'))) {
-      const request = pending.shift();
-      if (request) request(line);
+    if (pending.length) {
+      const request = pending[0];
+      if (!request.matches || request.matches(line)) {
+        pending.shift();
+        request.resolve(line);
+      }
     }
   }
 
-  async function send(command, wait = false) {
+  async function send(command, wait = false, matches = null) {
     if (!port?.writable) throw new Error('CDC не подключён');
     const writer = port.writable.getWriter();
+    let response = null;
+    let responsePromise = null;
+    if (wait) {
+      responsePromise = new Promise(resolve => {
+        pending.push({ resolve, matches });
+      });
+    }
     try {
       log(`> ${command}`);
-      if (wait) await new Promise(resolve => pending.push(() => resolve()));
       await writer.write(new TextEncoder().encode(`${command}\n`));
-    } finally { writer.releaseLock(); }
+    } finally {
+      writer.releaseLock();
+    }
+    if (responsePromise) response = await responsePromise;
+    return response;
+  }
+
+  function responseMatches(command, line) {
+    if (command === 'info') return line.startsWith('OK info ');
+    if (command === 'get_device') return line === 'OK device_end';
+    if (command === 'list') return line === 'OK list';
+    if (command === 'debounce') return line.startsWith('OK debounce_samples=');
+    return line.startsWith('OK ') || line.startsWith('ERR ');
+  }
+
+  async function requestCommand(command) {
+    if (!port?.writable) throw new Error('CDC не подключён');
+    await send(command, true, line => responseMatches(command, line));
   }
 
   async function command(command) {
@@ -291,8 +327,16 @@
       setConnected(true);
       log('OK connected baud=115200');
       readLoop();
-      // Load the descriptor before applying profile-sized bindings.
-      setTimeout(() => { command('info'); command('get_device'); command('list'); command('debounce'); }, 300);
+      // Serialize startup commands: the descriptor must be received before list
+      // can populate the profile-sized binding selectors.
+      setTimeout(() => {
+        commandChain = commandChain
+          .then(() => requestCommand('info'))
+          .then(() => requestCommand('get_device'))
+          .then(() => requestCommand('list'))
+          .then(() => requestCommand('debounce'))
+          .catch(error => log(`ERR code=COMMAND_FAILED message=${error.message}`, true));
+      }, 300);
     } catch (error) { log(`ERR code=CONNECT_FAILED message=${error.message}`, true); }
   }
 
