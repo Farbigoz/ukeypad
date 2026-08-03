@@ -8,7 +8,7 @@
 //  register access because the GPIO register struct layout varies across
 //  ESP32 Arduino core versions (GPIO.in is uint32_t on some, a union on
 //  others; GPIO.in1 likewise). At 2000 Hz × 6 pins = 12000 calls/sec,
-//  each digitalRead costs ~1 µs — ~12 µs/sec total, negligible for the ISR.
+//  each digitalRead costs ~1 µs; the total remains negligible for the ISR.
 //  flash cache is always on at runtime (we never erase/write flash from the
 //  ISR), so digitalRead from IRAM context is safe.
 // ---------------------------------------------------------------------------
@@ -20,7 +20,7 @@ static inline IRAM_ATTR bool fastReadPin(uint8_t pin)
 Button::Button()
     : _pin(0)
     , _integrator(0)
-    , _maxIntegrator(INTEGRATOR_MAX)
+    , _maxIntegrator(DeviceProfile::DEFAULT_DEBOUNCE_SAMPLES)
     , _state(false)
 {
 }
@@ -29,7 +29,7 @@ void Button::begin(uint8_t pin)
 {
     _pin        = pin;
     _integrator = 0;
-    _maxIntegrator = INTEGRATOR_MAX;
+    _maxIntegrator = DeviceProfile::DEFAULT_DEBOUNCE_SAMPLES;
     _state      = false;
 
     // Each switch is wired between its GPIO and GND. The internal pull-up
@@ -41,7 +41,7 @@ void Button::begin(uint8_t pin)
 
 // IRAM_ATTR is repeated on the definition (not only on the declaration in
 // the header) to guarantee placement in the IRAM section: the function runs
-// from the 2000 Hz scan ISR and must not depend on flash access.
+// from the profile-defined scan ISR and must not depend on flash access.
 IRAM_ATTR ButtonEvent Button::update()
 {
     // raw == true while the switch is physically actuated (pin pulled low).

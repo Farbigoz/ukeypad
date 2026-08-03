@@ -61,6 +61,7 @@
       <h2>Информация</h2>
       <div class="actions">
         <button id="info" class="secondary" disabled>Обновить info</button>
+        <button id="getDevice" class="secondary" disabled>Описание устройства</button>
       </div>
       <pre id="infoOutput" class="mono" style="margin-top:12px">—</pre>
     </section>
@@ -235,7 +236,7 @@
       log('OK connected baud=115200');
       readLoop();
       // The firmware prints its banner on CDC attach. Request current state too.
-      setTimeout(() => { command('info'); command('list'); command('debounce'); }, 300);
+      setTimeout(() => { command('info'); command('get_device'); command('list'); command('debounce'); }, 300);
     } catch (error) { log(`ERR code=CONNECT_FAILED message=${error.message}`, true); }
   }
 
@@ -250,6 +251,7 @@
   $('disconnect').onclick = disconnect;
   $('clearLog').onclick = () => { $('log').textContent = ''; };
   $('info').onclick = () => command('info');
+  $('getDevice').onclick = () => command('get_device');
   $('readBindings').onclick = () => command('list');
   $('save').onclick = () => command('save');
   $('reset').onclick = async () => { await command('reset'); setTimeout(() => command('list'), 100); };

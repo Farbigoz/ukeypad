@@ -15,7 +15,7 @@ Implemented today:
 
 - ESP32-S3 SuperMini + Arduino framework + TinyUSB;
 - six digital mechanical switches with `INPUT_PULLUP`;
-- 2000 Hz hardware-timer scan;
+- profile-defined hardware-timer scan (currently 2000 Hz);
 - integrator debounce;
 - standard USB HID Keyboard;
 - simultaneous keys and duplicate logical bindings;
@@ -24,6 +24,9 @@ Implemented today:
 - text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `test`,
   `debounce`, `stats`, `help`;
 - standalone Web Serial GUI in [docs/configurator.html](docs/configurator.html);
+- centralized compile-time profile in `src/DeviceProfile.h`;
+- centralized firmware/protocol/storage versions in `src/FirmwareVersion.h`;
+- separated `ConfigStorage`, `DeviceMetadata`, and `KeyNameTable` modules;
 - HID state reset when USB stops/disconnects.
 
 ## Design principles
@@ -74,7 +77,7 @@ built on undocumented assumptions.
 ### 0.1 Configuration format and versioning
 
 - Add a versioned NVS record with `magic`, `version`, payload length, and CRC.
-- Keep migration code for the current six-byte binding format.
+- Deliberately reject the old six-byte binding format; no migration is supported.
 - Validate every loaded HID code and fall back to defaults on corruption.
 - Make NVS write failures visible as `ERR code=NVS_WRITE_FAILED`.
 - Keep debounce persistence separate from hardware description.
@@ -368,7 +371,7 @@ Or provide a GUI wizard. Calibration data should include:
 - release threshold;
 - sensor range/quality.
 
-Calibration must never run from the 2000 Hz ISR and must not write NVS for
+Calibration must never run from the profile-defined scan ISR and must not write NVS for
 every ADC sample.
 
 ### 2.4 Rapid Trigger as a separate feature
@@ -483,7 +486,7 @@ Recommended response strategy:
 Example conceptual response:
 
 ```text
-OK device model=esp32-s3-keypad firmware=0.2.0 protocol=2
+OK device model=ukeypad-esp32-s3 firmware=0.2.0 protocol=2
 OK inputs count=6 types=digital,digital,digital,digital,hall,hall
 OK leds count=16 rgb=ws2812 brightness=true effects=true
 OK capabilities binds=true test=true debounce=true calibration=true
@@ -611,7 +614,7 @@ led effect <name>
 led save
 ```
 
-All LED updates must run outside the 2000 Hz input ISR. A low-priority task or
+All LED updates must run outside the profile-defined input ISR. A low-priority task or
 scheduled update is preferred.
 
 ### 6.3 GUI controls

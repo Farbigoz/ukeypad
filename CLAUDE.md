@@ -1,10 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for working with the `ukeypad` firmware project.
 
 ## Project scope
 
-This is a PlatformIO Arduino firmware project for a general-purpose USB HID keypad on ESP32-S3 SuperMini. The current reference device has six mechanical switches:
+This is a PlatformIO Arduino firmware project for a general-purpose USB HID
+keypad on an ESP32-S3 SuperMini. The current reference profile has six digital
+mechanical switches:
 
 - GPIO4 → Z
 - GPIO5 → X
@@ -13,64 +15,64 @@ This is a PlatformIO Arduino firmware project for a general-purpose USB HID keyp
 - GPIO15 → F13
 - GPIO16 → F14
 
-The longer-term roadmap is in [plan.md](plan.md): compile-time device profiles with variable button counts, digital/Hall mixed inputs, ADC+DMA Hall processing, capability-driven GUI, and one RGB LED per physical button.
+The hardware profile is defined in [src/DeviceProfile.h](src/DeviceProfile.h).
+Do not duplicate model, GPIO, default binding, scan, debounce, LED, or
+capability values in runtime code or documentation. Future work is described
+in [plan.md](plan.md): variable compile-time profiles, Hall inputs, capability
+discovery, RGB output, and validated MCU backends.
 
 ## Common commands
 
-Run commands from the repository root (`d:/work/projects/osu_keypad`):
+Run commands from the repository root:
 
 ```bash
-# Build the current ESP32-S3 firmware
 pio run
-
-# Clean build artifacts, then rebuild
 pio run -t clean
-pio run
-
-# Upload over the ESP32-S3 ROM bootloader
 pio run -t upload
-
-# Upload to a specified port
 pio run -t upload --upload-port COMx
-
-# Open the UART monitor (115200 baud)
 pio device monitor
 
-# Validate the embedded JavaScript in the web configurator
 python -c "import re; s=open('docs/configurator.html',encoding='utf-8').read(); m=re.search(r'<script>(.*?)</script>',s,re.S); open('.configurator-check.js','w',encoding='utf-8').write(m.group(1))"
 node --check .configurator-check.js
 rm .configurator-check.js
-
-# Basic HTML parser check
 python -c "from html.parser import HTMLParser; HTMLParser().feed(open('docs/configurator.html',encoding='utf-8').read()); print('HTML parsed')"
 
-# Check repository state
- git status --short --branch
+git status --short --branch
 ```
 
-There is currently no automated unit-test or lint suite. Firmware validation is presently the PlatformIO build plus hardware checks described in [README.md](README.md). Do not claim a hardware behavior has been verified unless the device was actually tested.
+There is no automated unit-test or lint suite. Firmware validation is the
+PlatformIO build plus hardware checks in [README.md](README.md). Never claim
+hardware behavior was verified unless the device was actually tested.
 
-For flashing, if native USB is not enumerated as an upload port, hold **BOOT**, tap **RESET**, release **BOOT**, then run the upload command. The application uses USB-OTG/TinyUSB mode and composite CDC+HID (`ARDUINO_USB_MODE=0`, `ARDUINO_USB_CDC_ON_BOOT=1`).
+For flashing, if native USB is not enumerated as an upload port, hold BOOT, tap
+RESET, release BOOT, then run the upload command. The application uses USB-OTG/
+TinyUSB and composite CDC+HID (`ARDUINO_USB_MODE=0`,
+`ARDUINO_USB_CDC_ON_BOOT=1`).
 
 ## Repository layout
 
 - `src/` — firmware.
-- `docs/index.html` — GitHub Pages project landing page.
-- `docs/configurator.html` — standalone Web Serial configuration GUI.
-- `platformio.ini` — current ESP32-S3 PlatformIO environment.
-- `README.md` — current firmware usage, wiring, config mode, protocol, and latency notes.
-- `plan.md` — future architecture and multi-platform roadmap.
+- `src/DeviceProfile.h` — compile-time hardware/profile source of truth.
+- `src/FirmwareVersion.h` — firmware, CDC protocol, and NVS format versions.
+- `src/ConfigStorage.*` — versioned NVS binding records and CRC validation.
+- `src/DeviceMetadata.*` — machine-readable CDC output.
+- `src/KeyNameTable.*` — HID name lookup.
+- `docs/index.html` — GitHub Pages landing page.
+- `docs/configurator.html` — standalone Web Serial GUI.
+- `platformio.ini` — PlatformIO environment.
+- `README.md` — build, wiring, protocol, and verification notes.
+- `plan.md` — roadmap and design decisions.
 
-GitHub Pages is configured from `master` and `/docs`; keep web links relative within `docs/` so the published site works at `/ukeypad/`.
+GitHub Pages uses `master` and `/docs`; keep links inside `docs/` relative.
 
 ## Firmware architecture
 
 The latency-critical path is:
 
 ```text
-Timer ISR (2000 Hz)
+Profile-defined timer ISR
   → Keypad::scan()
-  → Button::update() for every input
+  → Button::update() for every configured input
   → integrator debounce
   → lock-free SPSC event queue
   → binary semaphore
@@ -79,15 +81,23 @@ Timer ISR (2000 Hz)
   → USBHIDKeyboard pressRaw/releaseRaw
 ```
 
-`Button` owns one physical input and only handles GPIO sampling/debounce. It must not know about USB. `Keypad` owns the fixed input array, binding table, scan pass, event queue, runtime binding access, debounce settings, and diagnostics; it must not know HID details. `HidKeyboard` owns USB reports and duplicate-binding reference counts. Duplicate physical inputs mapped to one HID usage are supported: the logical key is released only after the last physical owner releases it.
+`Button` owns one physical input and debounce. It must not know about USB.
+`Keypad` owns profile-defined inputs, bindings, scan, queue, runtime debounce,
+and diagnostics; it must not know HID details. `HidKeyboard` owns USB reports
+and duplicate-binding reference counts. `ConfigStorage` owns NVS serialization
+but must not print CDC responses. `DeviceMetadata` owns protocol formatting but
+must not own device configuration.
 
-The event queue is single-producer/single-consumer: the timer ISR writes `_head`, while the main task reads `_tail`. Do not introduce blocking calls, Serial output, NVS writes, or USB calls into the scan ISR.
+The event queue is single-producer/single-consumer: the timer ISR writes
+`_head`, while the main task reads `_tail`. Never put blocking calls, Serial
+output, NVS writes, or USB calls into the scan ISR.
 
-`HidKeyboard` registers an `ARDUINO_USB_STOPPED_EVENT` callback. On USB stop/disconnect it calls `releaseAll()` and clears duplicate-binding refcounts to prevent stuck keys after reconnect.
+`HidKeyboard` registers an `ARDUINO_USB_STOPPED_EVENT` callback. On USB
+stop/disconnect it releases all HID state and clears duplicate-binding counts.
 
 ## Timer and ISR compatibility
 
-The installed environment is PlatformIO Espressif 32 7.0.1 with Arduino ESP32 core package `3.20017.241212`, but this core exposes the **legacy Arduino timer API** in the current build. The code intentionally uses:
+The installed environment uses the legacy Arduino timer API:
 
 ```cpp
 timerBegin(timerNumber, divider, countUp);
@@ -96,18 +106,26 @@ timerAlarmWrite(timer, alarmTicks, autoreload);
 timerAlarmEnable(timer);
 ```
 
-The current configuration uses timer 0, divider 80, and a 500-tick alarm: APB 80 MHz / 80 = 1 MHz, so 500 µs gives 2000 Hz. Do not blindly replace this with the newer `timerBegin(frequency)`/`timerAlarm()` API without checking the installed framework headers and rebuilding.
+Timer number, divider, target scan frequency, and derived alarm ticks are in
+`DeviceProfile.h`. The current profile is 2000 Hz: APB 80 MHz / divider 80 gives
+a 1 MHz timer tick and a 500-tick alarm. Do not replace the legacy API with the
+newer timer API without checking the installed framework headers and rebuilding.
 
-`IRAM_ATTR` is applied only to function definitions in `.cpp` files. Headers intentionally do not use it because some include paths parse them before `Arduino.h` defines the macro. GPIO reads currently use `digitalRead()` rather than version-dependent `GPIO.in`/`GPIO.in1` register layouts; preserve compilation compatibility unless a measured performance issue justifies a platform-specific fast GPIO backend.
+`IRAM_ATTR` is applied only to function definitions in `.cpp` files. GPIO reads
+use `digitalRead()` for compatibility with the installed core; preserve this
+unless a measured performance issue justifies a platform-specific backend.
 
-## Normal mode and config mode
+## Normal and config modes
 
-Both modes run the same 2000 Hz timer, GPIO scan, integrator debounce, and event queue. The only difference is the final consumer:
+Both modes use the same profile-defined timer, GPIO scan, integrator debounce,
+and event queue:
 
-- **Normal mode:** events are forwarded to `HidKeyboard`; CDC command handling is inert.
-- **Config mode:** hold any switch while booting; events are consumed by `Config::processKeyEvents()` and never reach HID. With `test on`, debounced events are printed over CDC.
+- **Normal mode:** events are forwarded to `HidKeyboard`; CDC commands are inert.
+- **Config mode:** hold any switch during boot; events are consumed by
+  `Config::processKeyEvents()` and never reach HID. With `test on`, debounced
+events are printed over CDC.
 
-The config protocol is line-oriented and case-insensitive. Current commands include:
+The CDC protocol is line-oriented and case-insensitive. Current commands:
 
 ```text
 bind <slot> <key>
@@ -115,26 +133,36 @@ list
 save
 reset
 info
+get_device
 test [on|off]
 debounce [get|set N]
 stats [clear]
 help
 ```
 
-Successful responses begin with `OK`; errors use `ERR code=...`. Keep protocol responses deterministic and machine-parseable because the browser GUI depends on them.
+Responses must remain deterministic and machine-parseable: success begins with
+`OK`, command errors use `ERR code=...`, and `list` ends with `OK list`.
 
-Bindings are stored in ESP32 NVS under namespace `osukp`. Current NVS storage is a six-byte binding payload; the roadmap calls for adding version/magic/CRC before expanding configuration formats. Debounce changes are currently runtime-only unless explicitly extended.
+Bindings are stored in NVS namespace `ukeypad`, key `bindings`, using the
+versioned record implemented by `ConfigStorage`. The old raw six-byte format is
+not supported or migrated. Debounce changes are runtime-only.
 
 ## Web configurator
 
-`docs/configurator.html` uses Web Serial and requires a Chromium desktop browser (Chrome/Edge). It expects config mode and sends the text protocol above. Keep it dependency-free and relative-path compatible with GitHub Pages. When changing firmware protocol responses, update the GUI parser and README together.
-
-The GUI currently assumes six slots and fixed key choices; future capability-driven GUI work must wait for a stable device-description protocol as outlined in `plan.md`.
+`docs/configurator.html` uses Web Serial and requires a Chromium desktop browser
+(Chrome/Edge). It expects config mode. When protocol responses change, update the
+GUI parser and README together. The GUI currently has a fixed six-slot layout;
+dynamic capability-driven rendering is a later phase.
 
 ## Platform expansion rules
 
-The current implementation is ESP32-S3-specific. Future backends should keep the common core free of vendor headers and isolate platform code for USB, timers, GPIO, ADC/DMA, and storage.
+The current implementation is ESP32-S3-specific. Future backends must isolate
+USB, timers, GPIO, ADC/DMA, and storage from the common input/event layers.
+Do not promise support for a platform merely because an Arduino core exists.
+A supported backend needs mature native USB HID+CDC, reproducible build/upload,
+measured timer/input behavior, suitable ADC/DMA for Hall profiles, and reliable
+nonvolatile storage.
 
-Do not promise support for a platform merely because an Arduino core exists. A supported backend needs a mature native USB device stack for HID+CDC, reproducible PlatformIO build/upload, measured timer/input behavior, appropriate ADC+DMA support for Hall profiles, and reliable nonvolatile storage. Preferred directions are ESP32-S3 TinyUSB, selected STM32 families through Cube/TinyUSB, RP2040/RP2350 through Pico SDK/TinyUSB, and nRF52840 through an established USB stack. CH32 remains experimental until a specific part and USB path pass the acceptance checklist in [plan.md](plan.md).
-
-A small common C API or statically selected template composition is preferred over virtual dispatch in the latency path. Weak hooks are appropriate at the platform boundary, not throughout the core. Avoid adding ETL delegates or a general callback framework without a concrete requirement.
+Prefer a small common C API or static composition over virtual dispatch in the
+latency path. Avoid general callback frameworks until a concrete requirement
+exists.

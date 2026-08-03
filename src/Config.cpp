@@ -1,97 +1,84 @@
 #include "Config.h"
 #include "Keypad.h"
 #include <Arduino.h>
-#include <Preferences.h>
+#include "DeviceMetadata.h"
+#include "KeyNameTable.h"
+#include "ConfigStorage.h"
 
-// ---------------------------------------------------------------------------
-//  Key-name -> HidKeycode lookup (case-insensitive). Covers keys most likely
-//  to be bound on a keypad; extend as needed. Names mirror HidKeycode members.
-//  Digits are accepted as "0".."9" (mapping to Num0..Num9).
-// ---------------------------------------------------------------------------
-struct KeyName {
-    const char* name;
-    HidKeycode  code;
-};
-
-static const KeyName KEY_NAMES[] = {
-    // letters
-    {"A", HidKeycode::A}, {"B", HidKeycode::B}, {"C", HidKeycode::C},
-    {"D", HidKeycode::D}, {"E", HidKeycode::E}, {"F", HidKeycode::F},
-    {"G", HidKeycode::G}, {"H", HidKeycode::H}, {"I", HidKeycode::I},
-    {"J", HidKeycode::J}, {"K", HidKeycode::K}, {"L", HidKeycode::L},
-    {"M", HidKeycode::M}, {"N", HidKeycode::N}, {"O", HidKeycode::O},
-    {"P", HidKeycode::P}, {"Q", HidKeycode::Q}, {"R", HidKeycode::R},
-    {"S", HidKeycode::S}, {"T", HidKeycode::T}, {"U", HidKeycode::U},
-    {"V", HidKeycode::V}, {"W", HidKeycode::W}, {"X", HidKeycode::X},
-    {"Y", HidKeycode::Y}, {"Z", HidKeycode::Z},
-    // digits (top row)
-    {"0", HidKeycode::Num0}, {"1", HidKeycode::Num1}, {"2", HidKeycode::Num2},
-    {"3", HidKeycode::Num3}, {"4", HidKeycode::Num4}, {"5", HidKeycode::Num5},
-    {"6", HidKeycode::Num6}, {"7", HidKeycode::Num7}, {"8", HidKeycode::Num8},
-    {"9", HidKeycode::Num9},
-    // function row
-    {"F1",  HidKeycode::F1},  {"F2",  HidKeycode::F2},  {"F3",  HidKeycode::F3},
-    {"F4",  HidKeycode::F4},  {"F5",  HidKeycode::F5},  {"F6",  HidKeycode::F6},
-    {"F7",  HidKeycode::F7},  {"F8",  HidKeycode::F8},  {"F9",  HidKeycode::F9},
-    {"F10", HidKeycode::F10}, {"F11", HidKeycode::F11}, {"F12", HidKeycode::F12},
-    {"F13", HidKeycode::F13}, {"F14", HidKeycode::F14}, {"F15", HidKeycode::F15},
-    {"F16", HidKeycode::F16}, {"F17", HidKeycode::F17}, {"F18", HidKeycode::F18},
-    {"F19", HidKeycode::F19}, {"F20", HidKeycode::F20}, {"F21", HidKeycode::F21},
-    {"F22", HidKeycode::F22}, {"F23", HidKeycode::F23}, {"F24", HidKeycode::F24},
-    // common named keys
-    {"ENTER",      HidKeycode::Enter},     {"RETURN", HidKeycode::Enter},
-    {"ESC",        HidKeycode::Escape},    {"ESCAPE", HidKeycode::Escape},
-    {"TAB",        HidKeycode::Tab},       {"SPACE",  HidKeycode::Space},
-    {"BACKSPACE",  HidKeycode::Backspace},
-    {"INSERT",     HidKeycode::Insert},    {"DELETE",  HidKeycode::Delete},
-    {"HOME",       HidKeycode::Home},      {"END",     HidKeycode::End},
-    {"PAGEUP",     HidKeycode::PageUp},    {"PAGEDOWN", HidKeycode::PageDown},
-    {"PGUP",       HidKeycode::PageUp},    {"PGDN",    HidKeycode::PageDown},
-    {"UP",         HidKeycode::ArrowUp},   {"DOWN",    HidKeycode::ArrowDown},
-    {"LEFT",       HidKeycode::ArrowLeft}, {"RIGHT",   HidKeycode::ArrowRight},
-    {"CAPSLOCK",   HidKeycode::CapsLock},
-    {"PRINTSCREEN",HidKeycode::PrintScreen},{"PRTSC",  HidKeycode::PrintScreen},
-    {"SCROLLLOCK", HidKeycode::ScrollLock},
-    {"MENU",       HidKeycode::Menu},      {"APP",     HidKeycode::Application},
-    {"MUTE",       HidKeycode::Mute},
-    {"VOLUP",      HidKeycode::VolumeUp},  {"VOLDN",   HidKeycode::VolumeDown},
-    // modifiers
-    {"CTRL",    HidKeycode::ControlLeft},  {"CONTROL", HidKeycode::ControlLeft},
-    {"LCTRL",   HidKeycode::ControlLeft},  {"RCTRL",   HidKeycode::ControlRight},
-    {"SHIFT",   HidKeycode::ShiftLeft},    {"LSHIFT",  HidKeycode::ShiftLeft},
-    {"RSHIFT",  HidKeycode::ShiftRight},
-    {"ALT",     HidKeycode::AltLeft},      {"LALT",    HidKeycode::AltLeft},
-    {"RALT",    HidKeycode::AltRight},     {"ALTGR",   HidKeycode::AltRight},
-    {"GUI",     HidKeycode::GuiLeft},      {"WIN",     HidKeycode::GuiLeft},
-    {"LWIN",    HidKeycode::GuiLeft},      {"RWIN",    HidKeycode::GuiRight},
-    {"CMD",     HidKeycode::GuiLeft},
-};
-
-static constexpr uint8_t KEY_NAME_COUNT =
-    sizeof(KEY_NAMES) / sizeof(KEY_NAMES[0]);
-
-// Case-insensitive ASCII compare; both sides uppercased internally.
+namespace {
 static bool nameEq(const char* a, const char* b)
 {
     while (*a && *b) {
         if (toupper(static_cast<unsigned char>(*a)) !=
-            toupper(static_cast<unsigned char>(*b)))
-            return false;
+            toupper(static_cast<unsigned char>(*b))) return false;
         ++a; ++b;
     }
-    return (*a == '\0' && *b == '\0');
+    return *a == '\0' && *b == '\0';
 }
 
-// Reverse-lookup: HidKeycode -> human-readable name (first match).
-static const char* keyName(HidKeycode code)
+constexpr uint32_t CDC_BAUD_RATE = 115200;
+
+}
+
+
+const char* configErrorName(ConfigError error)
 {
-    const uint8_t raw = static_cast<uint8_t>(code);
-    for (uint8_t i = 0; i < KEY_NAME_COUNT; ++i) {
-        if (static_cast<uint8_t>(KEY_NAMES[i].code) == raw) {
-            return KEY_NAMES[i].name;
-        }
+    switch (error) {
+        case ConfigError::InvalidArgument: return "INVALID_ARGUMENT";
+        case ConfigError::InvalidValue: return "INVALID_VALUE";
+        case ConfigError::InvalidSlot: return "INVALID_SLOT";
+        case ConfigError::UnknownKey: return "UNKNOWN_KEY";
+        case ConfigError::UnknownCommand: return "UNKNOWN_COMMAND";
+        case ConfigError::NvsWriteFailed: return "NVS_WRITE_FAILED";
+        case ConfigError::NvsOpenFailed: return "OPEN_FAILED";
+        case ConfigError::NvsMissing: return "MISSING";
+        case ConfigError::NvsSizeMismatch: return "SIZE_MISMATCH";
+        case ConfigError::NvsBadMagic: return "BAD_MAGIC";
+        case ConfigError::NvsBadVersion: return "BAD_VERSION";
+        case ConfigError::NvsBadLength: return "BAD_LENGTH";
+        case ConfigError::NvsBadCrc: return "BAD_CRC";
+        case ConfigError::NvsBadHidCode: return "BAD_HIDCODE";
     }
-    return nullptr;
+    return "UNKNOWN";
+}
+
+static void printError(ConfigError error)
+{
+    Serial.print("ERR code=");
+    Serial.println(configErrorName(error));
+}
+
+static void printError(ConfigError error, const char* field, const char* value)
+{
+    Serial.print("ERR code=");
+    Serial.print(configErrorName(error));
+    Serial.print(' ');
+    Serial.print(field);
+    Serial.print('=');
+    Serial.println(value);
+}
+
+static void printError(ConfigError error, const char* field, long value)
+{
+    Serial.print("ERR code=");
+    Serial.print(configErrorName(error));
+    Serial.print(' ');
+    Serial.print(field);
+    Serial.print('=');
+    Serial.println(value);
+}
+
+static void printNvsWarning(ConfigError reason, bool enabled)
+{
+    if (enabled) {
+        Serial.print("WARN code=NVS_LOAD_FAILED reason=");
+        Serial.println(configErrorName(reason));
+    }
+}
+
+void Config::warnNvsLoad(ConfigError reason) const
+{
+    printNvsWarning(reason, _configMode);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +95,16 @@ Config::Config()
 {
 }
 
+void Config::printBanner() const
+{
+    Serial.println();
+    Serial.println("=== USB HID keypad — CONFIG MODE ===");
+    Serial.println("Hold any switch while plugging in to enter this mode.");
+    Serial.println("Type 'help' for commands. Reboot (RESET) to play.");
+    Serial.println();
+    printBindings(*_keypad, Serial);
+}
+
 void Config::begin(Keypad& keypad, bool configMode)
 {
     _keypad    = &keypad;
@@ -119,54 +116,19 @@ void Config::begin(Keypad& keypad, bool configMode)
 
     if (_configMode) {
         // CDC Serial: begin() is a no-op for CDC but harmless and conventional.
-        Serial.begin(115200);
+        Serial.begin(CDC_BAUD_RATE);
         // Banner is printed from poll() once a terminal is attached, because
         // the host may not have enumerated the CDC port yet at this instant.
     }
 }
 
-// --- NVS persistence (6 hidCode bytes under key "binds") -------------------
+// --- Versioned NVS persistence ----------------------------------------------
 
-void Config::loadFromNvs()
-{
-    Preferences prefs;
-    prefs.begin("osukp", true);   // read-only
-    uint8_t buf[Keypad::KEY_COUNT];
-    size_t n = prefs.getBytes("binds", buf, sizeof(buf));
-    prefs.end();
-    if (n == sizeof(buf)) {
-        for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
-            _keypad->setBinding(i, static_cast<HidKeycode>(buf[i]));
-        }
-    }
-}
+static ConfigError configErrorFor(StorageResult result) { switch(result) { case StorageResult::OpenFailed:return ConfigError::NvsOpenFailed; case StorageResult::Missing:return ConfigError::NvsMissing; case StorageResult::SizeMismatch:return ConfigError::NvsSizeMismatch; case StorageResult::BadMagic:return ConfigError::NvsBadMagic; case StorageResult::BadVersion:return ConfigError::NvsBadVersion; case StorageResult::BadLength:return ConfigError::NvsBadLength; case StorageResult::BadCrc:return ConfigError::NvsBadCrc; case StorageResult::BadHidCode:return ConfigError::NvsBadHidCode; case StorageResult::WriteFailed:return ConfigError::NvsWriteFailed; case StorageResult::Loaded: break; } return ConfigError::NvsOpenFailed; }
 
-void Config::saveToNvs()
-{
-    uint8_t buf[Keypad::KEY_COUNT];
-    for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
-        buf[i] = static_cast<uint8_t>(_keypad->getBinding(i));
-    }
-    Preferences prefs;
-    prefs.begin("osukp", false);  // read-write
-    prefs.putBytes("binds", buf, sizeof(buf));
-    prefs.end();
-}
+void Config::loadFromNvs() { const StorageResult result=loadBindings(*_keypad); if(result!=StorageResult::Loaded && result!=StorageResult::Missing) warnNvsLoad(configErrorFor(result)); }
+bool Config::saveToNvs() { return saveBindings(*_keypad)==StorageResult::Loaded; }
 
-// --- key-name parsing -------------------------------------------------------
-
-bool Config::parseKey(const char* tok, HidKeycode& out) const
-{
-    for (uint8_t i = 0; i < KEY_NAME_COUNT; ++i) {
-        if (nameEq(tok, KEY_NAMES[i].name)) {
-            out = KEY_NAMES[i].code;
-            return true;
-        }
-    }
-    return false;
-}
-
-// --- serial command handling -------------------------------------------------
 
 void Config::processKeyEvents()
 {
@@ -246,7 +208,9 @@ void Config::handleLine()
     if (n == 0) return;
 
     if (nameEq(tok[0], "info")) {
-        Serial.println("OK info model=esp32-s3-keypad firmware=0.1.0 keys=6 scan_hz=2000 usb=cdc+hid");
+        printInfo(Serial);
+    } else if (nameEq(tok[0], "get_device")) {
+        printDeviceDescription(*_keypad, Serial);
     } else if (nameEq(tok[0], "test")) {
         if (n == 1 || nameEq(tok[1], "on")) {
             _testMode = true;
@@ -255,7 +219,7 @@ void Config::handleLine()
             _testMode = false;
             Serial.println("OK test=off");
         } else {
-            Serial.println("ERR code=INVALID_ARGUMENT usage=test [on|off]");
+            printError(ConfigError::InvalidArgument, "usage", "test [on|off]");
         }
     } else if (nameEq(tok[0], "debounce")) {
         if (n == 1 || nameEq(tok[1], "get")) {
@@ -263,13 +227,13 @@ void Config::handleLine()
         } else if (n >= 3 && nameEq(tok[1], "set")) {
             char* endp = nullptr; long value = strtol(tok[2], &endp, 10);
             if (*endp != '\0' || value < 1 || value > 255) {
-                Serial.println("ERR code=INVALID_VALUE debounce_range=1..255");
+                printError(ConfigError::InvalidValue, "debounce_range", "1..255");
             } else {
                 _keypad->setDebounce(static_cast<uint8_t>(value));
                 Serial.print("OK debounce_samples="); Serial.println(value);
             }
         } else {
-            Serial.println("ERR code=INVALID_ARGUMENT usage=debounce [get|set N]");
+            printError(ConfigError::InvalidArgument, "usage", "debounce [get|set N]");
         }
     } else if (nameEq(tok[0], "stats")) {
         if (n >= 2 && nameEq(tok[1], "clear")) {
@@ -281,102 +245,45 @@ void Config::handleLine()
             Serial.print(" overflow="); Serial.print(_keypad->overflowCount());
             Serial.print(" queue_max="); Serial.println(_keypad->maxQueueDepth());
         } else {
-            Serial.println("ERR code=INVALID_ARGUMENT usage=stats [clear]");
+            printError(ConfigError::InvalidArgument, "usage", "stats [clear]");
         }
     } else if (nameEq(tok[0], "help") || nameEq(tok[0], "?")) {
-        printHelp();
+        printHelp(Serial);
     } else if (nameEq(tok[0], "list")) {
-        printBindings();
+        printBindings(*_keypad, Serial);
     } else if (nameEq(tok[0], "save")) {
-        saveToNvs();
-        Serial.println("OK saved");
+        if (saveToNvs()) {
+            Serial.println("OK saved");
+        } else {
+            printError(ConfigError::NvsWriteFailed);
+        }
     } else if (nameEq(tok[0], "reset")) {
         _keypad->loadDefaultBindings();
-        Serial.println("OK defaults restored (RAM). Type 'save' to persist.");
+        Serial.println("OK reset defaults_restored=true persisted=false");
     } else if (nameEq(tok[0], "bind")) {
         if (n < 3) {
-            Serial.println("ERR code=INVALID_ARGUMENT usage=bind <slot> <key>");
+            printError(ConfigError::InvalidArgument, "usage", "bind <slot> <key>");
             return;
         }
         // Parse slot (0..5) with full validation.
         char* endp = nullptr;
         long slot = strtol(tok[1], &endp, 10);
         if (*endp != '\0' || slot < 0 || slot >= Keypad::KEY_COUNT) {
-            Serial.println("ERR code=INVALID_SLOT expected=0..5");
+            printError(ConfigError::InvalidSlot, "expected", "0..5");
             return;
         }
         HidKeycode code;
-        if (!parseKey(tok[2], code)) {
-            Serial.print("ERR code=UNKNOWN_KEY key=");
-            Serial.println(tok[2]);
+        if (!keyNameLookup(tok[2], code)) {
+            printError(ConfigError::UnknownKey, "key", tok[2]);
             return;
         }
         _keypad->setBinding(static_cast<uint8_t>(slot), code);
-        const char* nm = keyName(code);
+        const char* nm = keyNameFor(code);
         Serial.print("OK slot ");
         Serial.print(slot);
         Serial.print(" -> ");
         Serial.println(nm ? nm : tok[2]);
     } else {
-        Serial.print("ERR code=UNKNOWN_COMMAND command=");
-        Serial.println(tok[0]);
+        printError(ConfigError::UnknownCommand, "command", tok[0]);
     }
-}
-
-// --- output helpers ----------------------------------------------------------
-
-void Config::printBanner()
-{
-    Serial.println();
-    Serial.println("=== USB HID keypad â€” CONFIG MODE ===");
-    Serial.println("Hold any switch while plugging in to enter this mode.");
-    Serial.println("Type 'help' for commands. Reboot (RESET) to play.");
-    Serial.println();
-    printBindings();
-}
-
-void Config::printBindings()
-{
-    Serial.println("Current bindings:");
-    for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
-        const HidKeycode code = _keypad->getBinding(i);
-        const char* nm = keyName(code);
-        Serial.print("  slot ");
-        Serial.print(i);
-        Serial.print(" -> ");
-        if (nm) {
-            Serial.print(nm);
-        } else {
-            Serial.print("0x");
-            Serial.print(static_cast<uint8_t>(code), HEX);
-        }
-        Serial.print("  (0x");
-        if (static_cast<uint8_t>(code) < 0x10) Serial.print('0');
-        Serial.print(static_cast<uint8_t>(code), HEX);
-        Serial.println(")");
-    }
-}
-
-void Config::printHelp()
-{
-    Serial.println("Commands:");
-    Serial.println("  bind <slot> <key>   set slot (0..5) to a key");
-    Serial.println("  list                show current bindings");
-    Serial.println("  save                write bindings to flash (NVS)");
-    Serial.println("  reset               restore defaults (RAM; 'save' to keep)");
-    Serial.println("  info                firmware and hardware information");
-    Serial.println("  test [on|off]       monitor raw GPIO transitions");
-    Serial.println("  debounce [get|set N] read/set debounce samples");
-    Serial.println("  stats [clear]       show/clear scan and queue counters");
-    Serial.println("  help                this message");
-    Serial.println();
-    Serial.println("Keys: A-Z  0-9  F1-F24  ENTER SPACE TAB ESC");
-    Serial.println("  ARROWS (UP DOWN LEFT RIGHT)  MODIFIERS (CTRL SHIFT ALT GUI WIN)");
-    Serial.println("  BACKSPACE INSERT DELETE HOME END PAGEUP PAGEDOWN");
-    Serial.println("  CAPSLOCK PRINTSCREEN SCROLLLOCK MUTE VOLUP VOLDN");
-    Serial.println();
-    Serial.println("Examples:");
-    Serial.println("  bind 0 Z       -> slot 0 sends Z");
-    Serial.println("  bind 4 F13     -> slot 4 sends F13");
-    Serial.println("  bind 2 5       -> slot 2 sends digit 5");
 }

@@ -4,7 +4,7 @@
 //  Two modes, one firmware, selected at boot:
 //
 //    NORMAL MODE  (plug in without holding any switch):
-//      hardware timer (2000 Hz ISR)  ->  Keypad::scan()  ->  lock-free queue
+//      hardware timer (DeviceProfile::SCAN_FREQUENCY_HZ Hz ISR)  ->  Keypad::scan()  ->  lock-free queue
 //           ->  main loop: semaphore-wake  ->  HidKeyboard (immediate report)
 //      CDC Serial port is inert; config commands are silently ignored.
 //
@@ -24,13 +24,10 @@
 #include "Keypad.h"
 #include "HidKeyboard.h"
 #include "Config.h"
+#include "DeviceProfile.h"
 
-//  Hardware timer (core 2.x API): APB clock = 80 MHz, divider = 80 gives a
-//  1 MHz tick (1 tick = 1 us). Alarm every 500 ticks -> 2000 Hz scan.
-static constexpr uint8_t  TIMER_NUM   = 0;     // hardware timer 0
-static constexpr uint16_t TIMER_DIV   = 80;    // 80 MHz / 80 = 1 MHz
-static constexpr uint64_t SCAN_ALARM  = 500;   // 500 us -> 2000 Hz
-
+// Hardware timer settings come from the selected device profile. The legacy
+// Arduino timer API remains intentionally unchanged for this environment.
 //  Semaphore: signalled from the scan ISR when >= 1 event was queued.
 //  Lets the main loop sleep instead of busy-spinning, without adding latency.
 static SemaphoreHandle_t s_eventSem = nullptr;
@@ -77,14 +74,16 @@ void setup()
     // never runs against a null handle.
     s_eventSem = xSemaphoreCreateBinary();
 
-    // Start the same 2000 Hz scan timer in both modes. In config mode the
+    // Start the same profile-defined scan timer in both modes. In config mode the
     // resulting debounced events are consumed by Config::processKeyEvents()
     // and never forwarded to HidKeyboard; this keeps diagnostics identical
     // to normal operation while preventing host keypresses.
-    g_scanTimer = timerBegin(TIMER_NUM, TIMER_DIV, true); // timer0, 1 MHz, countUp
-    timerAttachInterrupt(g_scanTimer, &onScanTimer, true); // edge=true
-    timerAlarmWrite(g_scanTimer, SCAN_ALARM, true);        // 500 us, autoreload
-    timerAlarmEnable(g_scanTimer);                        // 2000 Hz
+    g_scanTimer = timerBegin(DeviceProfile::TIMER_NUMBER,
+                             DeviceProfile::TIMER_DIVIDER,
+                             true);
+    timerAttachInterrupt(g_scanTimer, &onScanTimer, true);
+    timerAlarmWrite(g_scanTimer, DeviceProfile::SCAN_ALARM_TICKS, true);
+    timerAlarmEnable(g_scanTimer); // DeviceProfile::SCAN_FREQUENCY_HZ Hz
 }
 
 void loop()
