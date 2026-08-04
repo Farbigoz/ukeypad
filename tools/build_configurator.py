@@ -11,6 +11,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 JS_FILES = (
+    "i18n.js",
     "state.js",
     "device-view.js",
     "bindings-view.js",

@@ -1,6 +1,6 @@
   const setConnected = connected => {
     $('dot').classList.toggle('connected', connected);
-    $('status').textContent = connected ? 'Подключено' : 'Не подключено';
+    $('status').textContent = connected ? t('connected') : t('notConnected');
     $('connect').disabled = connected;
     $('disconnect').disabled = !connected;
     document.querySelectorAll('button:not(#connect):not(#disconnect):not(#clearLog), input, select')
@@ -60,7 +60,7 @@
   }
 
   async function send(command, wait = false, matches = null) {
-    if (!port?.writable) throw new Error('CDC не подключён');
+    if (!port?.writable) throw new Error(t('cdcDisconnected'));
     const writer = port.writable.getWriter();
     let response = null;
     let responsePromise = null;
@@ -88,7 +88,7 @@
   }
 
   async function requestCommand(command) {
-    if (!port?.writable) throw new Error('CDC не подключён');
+    if (!port?.writable) throw new Error(t('cdcDisconnected'));
     await send(command, true, line => responseMatches(command, line));
   }
 

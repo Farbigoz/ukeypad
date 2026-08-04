@@ -1,14 +1,15 @@
   $('connect').onclick = connect;
   $('disconnect').onclick = disconnect;
   $('clearLog').onclick = () => { $('log').textContent = ''; };
+  $('langSelect').onchange = event => applyLang(event.target.value);
   $('boot').onclick = async () => {
-    if (!confirm('Перейти в ROM bootloader? Устройство отключится от USB.')) return;
+    if (!confirm(t('confirmBoot'))) return;
     await command('boot');
   };
   $('clearEvents').onclick = () => {
     $('events').replaceChildren();
     $('events').classList.add('empty-state');
-    $('events').textContent = 'Включите test и нажмите кнопку.';
+    $('events').textContent = t('emptyState');
   };
   $('info').onclick = () => command('info');
   $('getDevice').onclick = () => command('get_device');

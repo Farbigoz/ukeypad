@@ -19,6 +19,6 @@
   let descriptor = null;
   let descriptorFrame = null;
   const currentBindings = new Map();
-  const numberFormat = new Intl.NumberFormat('ru-RU');
+  // Number formatting is updated by the localization module.
   const infoFieldIds = ['infoModel', 'infoFirmware', 'infoProtocol', 'infoConfigVersion', 'infoInputs', 'infoLeds', 'infoScan', 'infoUsb', 'infoCapabilities'];
   const statsFieldIds = ['statsScan', 'statsEvents', 'statsOverflow', 'statsQueue'];

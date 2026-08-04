@@ -16,7 +16,7 @@
     $('statsOverflow').classList.remove('stat-warn');
     $('events').replaceChildren();
     $('events').classList.add('empty-state');
-    $('events').textContent = 'Включите test и нажмите кнопку.';
+    $('events').textContent = t('emptyState');
   }
 
   function renderInfo(line) {
@@ -27,7 +27,7 @@
     setText('infoConfigVersion', fields.config_version);
     setText('infoInputs', fields.input_count ? `${fields.input_count} (${fields.input_types || '—'})` : '—');
     setText('infoLeds', fields.led_count);
-    setText('infoScan', fields.scan_hz ? `${numberFormat.format(Number(fields.scan_hz))} Гц` : '—');
+    setText('infoScan', fields.scan_hz ? `${numberFormat.format(Number(fields.scan_hz))} ${t('hz')}` : '—');
     setText('infoUsb', fields.usb);
     setText('infoCapabilities', fields.capabilities ? fields.capabilities.split(',').map(item => item.replace('=', ': ')).join(' · ') : '—');
   }

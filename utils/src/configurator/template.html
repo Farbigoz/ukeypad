@@ -8,102 +8,103 @@
 </head>
 <body>
 <main>
-  <h1>USB HID keypad configurator</h1>
-  <p class="subtitle">Standalone Web Serial configurator. Работает в Chrome/Edge на desktop.</p>
+  <div class="language-picker"><select id="langSelect" data-always="true" aria-label="Language"><option value="ru" data-i18n="russian"></option><option value="en" data-i18n="english"></option></select></div>
+  <h1 data-i18n="pageTitle"></h1>
+  <p class="subtitle" data-i18n="subtitle"></p>
 
   <section class="panel">
     <div class="toolbar">
-      <button id="connect">Подключить CDC</button>
-      <button id="disconnect" class="secondary" disabled>Отключить</button>
-      <button id="clearLog" class="secondary">Очистить лог</button>
-      <button id="boot" class="danger" disabled>Перейти в bootloader</button>
+      <button id="connect" data-i18n="connect"></button>
+      <button id="disconnect" data-i18n="disconnect" class="secondary" disabled></button>
+      <button id="clearLog" data-i18n="clearLog" class="secondary"></button>
+      <button id="boot" data-i18n="boot" class="danger" disabled></button>
     </div>
-    <div class="status"><span id="dot" class="dot"></span><span id="status">Не подключено</span></div>
-    <p class="hint">Подключи keypad по USB и нажми «Подключить CDC». CDC-конфигурация и HID работают одновременно.</p>
-    <p id="unsupported" class="hint unsupported" hidden>Этот браузер не поддерживает Web Serial API. Используй Chrome или Edge на desktop.</p>
+    <div class="status"><span id="dot" class="dot"></span><span id="status" data-i18n="notConnected"></span></div>
+    <p class="hint" data-i18n="hintConnect"></p>
+    <p id="unsupported" data-i18n="unsupported" class="hint unsupported" hidden></p>
   </section>
 
   <div class="grid" style="margin-top:16px">
     <section class="panel">
-      <h2>Информация</h2>
+      <h2 data-i18n="info"></h2>
       <div class="actions">
-        <button id="info" class="secondary" disabled>Обновить info</button>
-        <button id="getDevice" class="secondary" disabled>Описание устройства</button>
+        <button id="info" data-i18n="info" class="secondary" disabled></button>
+        <button id="getDevice" data-i18n="deviceDescriptor" class="secondary" disabled></button>
       </div>
       <div id="infoOutput" class="info-grid">
-        <span class="info-label">Модель</span><span class="info-value" id="infoModel">—</span>
-        <span class="info-label">Прошивка</span><span class="info-value" id="infoFirmware">—</span>
-        <span class="info-label">Протокол</span><span class="info-value" id="infoProtocol">—</span>
-        <span class="info-label">Формат NVS</span><span class="info-value" id="infoConfigVersion">—</span>
-        <span class="info-label">Входы</span><span class="info-value" id="infoInputs">—</span>
-        <span class="info-label">Светодиоды</span><span class="info-value" id="infoLeds">—</span>
-        <span class="info-label">Сканирование</span><span class="info-value" id="infoScan">—</span>
+        <span class="info-label" data-i18n="model"></span><span class="info-value" id="infoModel">—</span>
+        <span class="info-label" data-i18n="firmware"></span><span class="info-value" id="infoFirmware">—</span>
+        <span class="info-label" data-i18n="protocol"></span><span class="info-value" id="infoProtocol">—</span>
+        <span class="info-label" data-i18n="nvsFormat"></span><span class="info-value" id="infoConfigVersion">—</span>
+        <span class="info-label" data-i18n="inputs"></span><span class="info-value" id="infoInputs">—</span>
+        <span class="info-label" data-i18n="leds"></span><span class="info-value" id="infoLeds">—</span>
+        <span class="info-label" data-i18n="scan"></span><span class="info-value" id="infoScan">—</span>
         <span class="info-label">USB</span><span class="info-value" id="infoUsb">—</span>
-        <span class="info-label">Возможности</span><span class="info-value" id="infoCapabilities">—</span>
+        <span class="info-label" data-i18n="capabilities"></span><span class="info-value" id="infoCapabilities">—</span>
       </div>
     </section>
     <section class="panel">
-      <h2>Debounce</h2>
+      <h2 data-i18n="debounce"></h2>
       <div class="toolbar">
         <input id="debounceValue" type="number" min="1" max="255" value="4" style="width:100px">
-        <span>samples</span>
-        <button id="readDebounce" class="secondary" disabled>Прочитать</button>
-        <button id="setDebounce" disabled>Применить</button>
+        <span data-i18n="samples"></span>
+        <button id="readDebounce" data-i18n="read" class="secondary" disabled></button>
+        <button id="setDebounce" data-i18n="apply" disabled></button>
       </div>
-      <p class="hint">При 2000 Гц: 4 samples ≈ 2 мс. Значение сохраняется в NVS командой «Сохранить в NVS».</p>
+      <p class="hint" data-i18n="debounceHint"></p>
     </section>
   </div>
 
   <section class="panel" style="margin-top:16px">
-    <h2>Бинды</h2>
+    <h2 data-i18n="bindings"></h2>
     <table>
-      <thead><tr><th>Слот</th><th>Тип</th><th>GPIO</th><th>Клавиша</th></tr></thead>
+      <thead><tr><th data-i18n="slot"></th><th data-i18n="type"></th><th data-i18n="gpio"></th><th data-i18n="key"></th></tr></thead>
       <tbody id="bindings"></tbody>
     </table>
     <div class="actions" style="margin-top:16px">
-      <button id="readBindings" class="secondary" disabled>Прочитать</button>
-      <button id="save" disabled>Сохранить в NVS</button>
-      <button id="reset" class="danger" disabled>Сбросить defaults</button>
+      <button id="readBindings" data-i18n="read" class="secondary" disabled></button>
+      <button id="save" data-i18n="save" disabled></button>
+      <button id="reset" data-i18n="reset" class="danger" disabled></button>
     </div>
-    <p class="hint">Дубликаты разрешены: две физические кнопки могут иметь один HID-код.</p>
+    <p class="hint" data-i18n="duplicates"></p>
   </section>
 
   <div class="grid" style="margin-top:16px">
     <section class="panel">
-      <h2>Тест кнопок</h2>
+      <h2 data-i18n="test"></h2>
       <div class="actions">
-        <button id="testOn" disabled>Включить test</button>
-        <button id="testOff" class="secondary" disabled>Выключить</button>
+        <button id="testOn" data-i18n="enableTest" disabled></button>
+        <button id="testOff" data-i18n="disable" class="secondary" disabled></button>
       </div>
-      <p class="hint">Тест использует тот же timer 2000 Гц и integrator debounce. События появляются в отдельном поле, а HID продолжает работать.</p>
+      <p class="hint" data-i18n="testHint"></p>
     </section>
     <section class="panel">
-      <h2>Статистика</h2>
+      <h2 data-i18n="stats"></h2>
       <div class="actions">
-        <button id="readStats" class="secondary" disabled>Прочитать</button>
-        <button id="clearStats" class="secondary" disabled>Очистить</button>
+        <button id="readStats" data-i18n="read" class="secondary" disabled></button>
+        <button id="clearStats" data-i18n="clear" class="secondary" disabled></button>
       </div>
       <div class="stats-grid" aria-live="polite">
-        <div class="stat-tile"><div class="stat-value" id="statsScan">—</div><div class="stat-label">Сканов</div></div>
-        <div class="stat-tile"><div class="stat-value" id="statsEvents">—</div><div class="stat-label">Событий</div></div>
-        <div class="stat-tile"><div class="stat-value" id="statsOverflow">—</div><div class="stat-label">Переполнений</div></div>
-        <div class="stat-tile"><div class="stat-value" id="statsQueue">—</div><div class="stat-label">Пик очереди</div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsScan">—</div><div class="stat-label" data-i18n="scans"></div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsEvents">—</div><div class="stat-label" data-i18n="events"></div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsOverflow">—</div><div class="stat-label" data-i18n="overflows"></div></div>
+        <div class="stat-tile"><div class="stat-value" id="statsQueue">—</div><div class="stat-label" data-i18n="queuePeak"></div></div>
       </div>
     </section>
   </div>
 
   <section class="panel" style="margin-top:16px">
     <div class="toolbar">
-      <h2 style="margin:0; flex:1">События кнопок</h2>
-      <label class="hint" style="margin:0"><input id="autoScrollEvents" type="checkbox" checked> автопрокрутка</label>
-      <button id="clearEvents" class="secondary">Очистить</button>
+      <h2 style="margin:0; flex:1" data-i18n="buttonEvents"></h2>
+      <label class="hint" style="margin:0"><input id="autoScrollEvents" type="checkbox" checked> <span data-i18n="autoScroll"></span></label>
+      <button id="clearEvents" data-i18n="clear" class="secondary"></button>
     </div>
-    <div id="events" class="events mono empty-state" aria-live="polite">Включите test и нажмите кнопку.</div>
+    <div id="events" class="events mono empty-state" aria-live="polite" data-i18n="emptyState"></div>
   </section>
 
   <details class="panel" style="margin-top:16px">
-    <summary>Технический лог CDC</summary>
-    <pre id="log" class="mono"></pre>
+    <summary data-i18n="cdcLog"></summary>
+    <pre id="log" data-i18n="cdcLog" class="mono"></pre>
   </details>
 </main>
 <!-- __SCRIPT__ -->
