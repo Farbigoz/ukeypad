@@ -36,8 +36,6 @@ public:
     uint8_t getPin(uint8_t slot) const;
     void loadDefaultBindings();
 
-    bool anySwitchHeld() const;
-
     void setDebounce(uint8_t samples);
     uint8_t debounce() const;
     bool rawPressed(uint8_t slot) const;

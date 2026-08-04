@@ -5,9 +5,8 @@
 
 class Keypad;
 
-// Result of a binding configuration load or save operation. The storage layer
-// returns typed results; the CDC protocol layer is responsible for formatting
-// them as OK/ERR/WARN responses.
+// Result of a configuration load or save operation. Bindings and the shared
+// debounce threshold are stored together; the CDC layer formats these results.
 enum class StorageResult : uint8_t {
     Loaded,
     Missing,
@@ -21,11 +20,11 @@ enum class StorageResult : uint8_t {
     WriteFailed,
 };
 
-// Load and validate the versioned binding record from NVS.
+// Load and validate the versioned binding/debounce record from NVS.
 //
-// On success, bindings are applied to `keypad` and Loaded is returned. The
-// keypad is not modified when any record validation check fails. The old raw
-// six-byte format is intentionally rejected; it is not migrated.
+// On success, bindings and the shared debounce threshold are applied to
+// `keypad`. The keypad is not modified when validation fails. Older records
+// are intentionally rejected; they are not migrated.
 StorageResult loadBindings(Keypad& keypad);
 
 // Serialize the current keypad bindings and store them in NVS.

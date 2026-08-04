@@ -1,23 +1,16 @@
 // ============================================================================
 //  USB HID keypad — main
 //
-//  Two modes, one firmware, selected at boot:
-//
-//    NORMAL MODE  (plug in without holding any switch):
-//      hardware timer (DeviceProfile::SCAN_FREQUENCY_HZ Hz ISR)  ->  Keypad::scan()  ->  lock-free queue
-//           ->  main loop: semaphore-wake  ->  HidKeyboard (immediate report)
-//      CDC Serial port is inert; config commands are silently ignored.
-//
-//    CONFIG MODE  (hold ANY switch while plugging in):
-//      scan timer is OFF (no keypresses sent).
-//      CDC Serial port accepts text commands: bind / list / save / reset / help.
-//      Saved binds live in NVS and survive power cycles.
-//      Reboot (tap RESET without holding a key) to enter normal mode.
-//
-//  End-to-end latency in normal mode: contact closure -> scan (<=0.5 ms) ->
-//  debounce (<=2 ms) -> USB report (host polls every 1 ms).
+//  Unified operation: the profile-defined timer scans and debounces inputs,
+//  the SPSC queue wakes the main loop, and each event is sent to HID plus the
+//  optional CDC test logger. CDC commands are always available alongside HID.
 // ============================================================================
 
+// Contact closure -> scan (<=0.5 ms) -> debounce (about 2 ms by default) ->
+// USB report (host polls every 1 ms).
+// ============================================================================
+
+//
 #include <Arduino.h>
 #include <freertos/semphr.h>
 
@@ -55,29 +48,21 @@ void ARDUINO_ISR_ATTR onScanTimer()
 
 void setup()
 {
-    // Bring up USB first (composite CDC + HID) so the host enumerates the
-    // device before we decide mode and start producing events.
+    // Bring up USB first (composite CDC + HID) before producing events.
     g_hid.begin();
 
     // Init buttons + load default bindings into the live table.
     g_keypad.begin();
 
-    // One unified operating mode: CDC configuration and HID output are
-    // available together. A held button no longer changes the boot behavior.
-    // Pass false so the old config-mode banner is not shown; Config::poll()
-    // still services the CDC command channel in this unified mode.
-    g_config.begin(g_keypad, false); // unified mode, not boot-selected config mode
-
-    // The legacy boot gesture is intentionally no longer consulted.
+    // CDC commands and HID output are available together.
+    g_config.begin(g_keypad);
 
     // Event semaphore (binary). Created before the timer starts so the ISR
     // never runs against a null handle.
     s_eventSem = xSemaphoreCreateBinary();
 
-    // Start the same profile-defined scan timer in both modes. In config mode the
-    // resulting debounced events are consumed by Config::processKeyEvents()
-    // and never forwarded to HidKeyboard; this keeps diagnostics identical
-    // to normal operation while preventing host keypresses.
+    // Start the profile-defined scan timer. Debounced events are forwarded to
+    // both HID and the optional CDC test logger from the main loop.
     g_scanTimer = timerBegin(DeviceProfile::TIMER_NUMBER,
                              DeviceProfile::TIMER_DIVIDER,
                              true);

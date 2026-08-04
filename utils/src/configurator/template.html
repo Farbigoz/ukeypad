@@ -18,7 +18,7 @@
       <button id="clearLog" class="secondary">Очистить лог</button>
     </div>
     <div class="status"><span id="dot" class="dot"></span><span id="status">Не подключено</span></div>
-    <p class="hint">Отключи keypad, зажми любую кнопку, подключи USB, затем нажми «Подключить CDC». В config mode HID-нажатия не отправляются.</p>
+    <p class="hint">Подключи keypad по USB и нажми «Подключить CDC». CDC-конфигурация и HID работают одновременно.</p>
     <p id="unsupported" class="hint unsupported" hidden>Этот браузер не поддерживает Web Serial API. Используй Chrome или Edge на desktop.</p>
   </section>
 
@@ -49,7 +49,7 @@
         <button id="readDebounce" class="secondary" disabled>Прочитать</button>
         <button id="setDebounce" disabled>Применить</button>
       </div>
-      <p class="hint">При 2000 Гц: 4 samples ≈ 2 мс. Значение действует до перезагрузки.</p>
+      <p class="hint">При 2000 Гц: 4 samples ≈ 2 мс. Значение сохраняется в NVS командой «Сохранить в NVS».</p>
     </section>
   </div>
 
@@ -74,7 +74,7 @@
         <button id="testOn" disabled>Включить test</button>
         <button id="testOff" class="secondary" disabled>Выключить</button>
       </div>
-      <p class="hint">Тест использует тот же timer 2000 Гц и integrator debounce, что и normal mode. События появляются в отдельном поле, HID не отправляет.</p>
+      <p class="hint">Тест использует тот же timer 2000 Гц и integrator debounce. События появляются в отдельном поле, а HID продолжает работать.</p>
     </section>
     <section class="panel">
       <h2>Статистика</h2>

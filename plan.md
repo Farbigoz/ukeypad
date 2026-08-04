@@ -19,7 +19,7 @@ Implemented today:
 - integrator debounce;
 - standard USB HID Keyboard;
 - simultaneous keys and duplicate logical bindings;
-- CDC configuration mode selected by holding any key during boot;
+- unified CDC + HID operation with an always-available configuration channel;
 - NVS-persisted key bindings;
 - text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `test`,
   `debounce`, `stats`, `help`;
@@ -82,7 +82,7 @@ Implemented in `src/ConfigStorage.*` and `src/FirmwareVersion.h`:
 - deliberate rejection of the old six-byte binding format; no migration;
 - HID-code validation with atomic fallback to profile defaults;
 - `ERR code=NVS_WRITE_FAILED` on failed writes;
-- debounce remains runtime-only and separate from the binding record.
+- debounce is persisted in the versioned NVS record alongside bindings.
 
 ### 0.2 Protocol contract — firmware foundation complete
 
@@ -105,15 +105,15 @@ Implemented:
 - `test` on the same scan/debounce path;
 - scan, event, overflow, and maximum queue-depth counters;
 - HID release/reset on USB stop/disconnect;
-- config mode consumes events without HID output.
+- CDC test logging is additive; events continue to produce HID output.
 
 The firmware does not attempt to infer whether a held button is intentionally
-pressed or mechanically stuck. The existing config-mode boot gesture and the
-`test` command are sufficient ways to exercise the physical inputs; no separate
-stuck-key validation window is planned.
+pressed or mechanically stuck. The `test` command exercises the physical inputs;
+no separate stuck-key validation window is planned.
 
-No manual HID-reset command is required at this time: HID state is reset by the
-USB stop callback, and HID output is suppressed entirely in config mode.
+No manual HID-reset command is required: HID state is reset by the USB stop
+callback. Held-key disconnect/reconnect behavior has been validated on the
+reference device without a stuck key after reconnect.
 
 ### 0.4 Regression checklist — static checks complete, hardware pending
 
@@ -130,7 +130,7 @@ Still requires real hardware if release-level acceptance evidence is needed:
 
 - individual, simultaneous, duplicate, and modifier bindings;
 - USB disconnect while keys are held, including reconnect behavior;
-- config-mode HID suppression;
+- unified-mode HID output remains active during CDC test logging;
 - NVS save/load/reset and corrupt-record fallback;
 - measured scan frequency, debounce timing, and end-to-end HID latency.
 
@@ -151,8 +151,8 @@ them measured or complete without testing the device.
 - `src/KeyNameTable.*` — HID name parsing and reverse lookup.
 
 The current profile is six digital inputs at 2000 Hz with a default debounce
-threshold of four samples. Runtime debounce changes are temporary and are not
-persisted.
+threshold of four samples. Debounce changes are persisted in the versioned NVS
+record when saved.
 
 ---
 
@@ -216,8 +216,8 @@ Implemented:
 - shared runtime sources across profile environments.
 
 Scalable HID is not part of the completed work. The current boot keyboard report
-still limits simultaneous ordinary keys to six; this is acceptable until a
-7+ simultaneous-key requirement appears.
+limits simultaneous ordinary keys to six, which is sufficient for the current
+reference profile; revisit only if more than six simultaneous keys is required.
 
 ---
 
@@ -393,8 +393,8 @@ Resolve these before implementing the corresponding phase:
 - Should the CDC protocol remain line-oriented text, or transition to framed
   JSON/binary only if capability discovery outgrows text?
 - What exact RGB hardware is planned, and what is the maximum LED current budget?
-- Which settings are runtime-only and which are persisted in NVS? Current
-  bindings persist; debounce does not.
+- Bindings and the shared debounce threshold are persisted together in NVS;
+  runtime-only settings may be added later.
 
 ---
 
@@ -410,9 +410,8 @@ for context.
 
 1. Keep the current digital firmware stable and document its existing
    diagnostics and recovery behavior.
-2. Implement a scalable HID report/backend now; the current six-button profile
-   already establishes the need to support six or more physical inputs without
-   the boot-report rollover ceiling.
+2. Keep the current six-key boot keyboard report; scalable HID is deferred until
+   a concrete requirement for more than six simultaneous ordinary keys appears.
 3. Add and build a second compile-time digital profile when a concrete board
    requires it.
 4. Make the configurator consume `get_device` dynamically.

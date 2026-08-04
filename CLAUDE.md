@@ -8,12 +8,12 @@ This is a PlatformIO Arduino firmware project for a general-purpose USB HID
 keypad on an ESP32-S3 SuperMini. The current reference profile has six digital
 mechanical switches:
 
-- GPIO4 → Z
-- GPIO5 → X
-- GPIO6 → C
-- GPIO7 → V
-- GPIO15 → F13
-- GPIO16 → F14
+- GPIO1 → Z
+- GPIO2 → X
+- GPIO3 → C
+- GPIO4 → V
+- GPIO5 → S
+- GPIO6 → D
 
 The hardware profiles are defined in [src/DeviceProfile.h](src/DeviceProfile.h).
 The default reference profile has six inputs; a selectable eight-input
@@ -128,11 +128,9 @@ integrator debounce, event queue, HID output, and CDC command channel are
 active together:
 
 - button events are forwarded to `HidKeyboard`;
-- CDC commands remain available without a boot gesture;
+- CDC commands are always available;
 - `test on` additionally prints debounced events over CDC without suppressing
   HID output.
-
-There is no separate config-mode boot gesture.
 
 The CDC protocol is line-oriented and case-insensitive. Current commands:
 
@@ -154,7 +152,7 @@ Responses must remain deterministic and machine-parseable: success begins with
 
 Bindings are stored in NVS namespace `ukeypad`, key `bindings`, using the
 versioned record implemented by `ConfigStorage`. The old raw six-byte format is
-not supported or migrated. Debounce changes are runtime-only.
+not supported or migrated. Debounce changes are persisted in the versioned NVS configuration record.
 
 ## Web configurator
 

@@ -4,6 +4,7 @@
 #include "DeviceMetadata.h"
 #include "KeyNameTable.h"
 #include "ConfigStorage.h"
+#include "DeviceProfile.h"
 
 namespace {
 static bool nameEq(const char* a, const char* b)
@@ -68,17 +69,15 @@ static void printError(ConfigError error, const char* field, long value)
     Serial.println(value);
 }
 
-static void printNvsWarning(ConfigError reason, bool enabled)
+static void printNvsWarning(ConfigError reason)
 {
-    if (enabled) {
-        Serial.print("WARN code=NVS_LOAD_FAILED reason=");
-        Serial.println(configErrorName(reason));
-    }
+    Serial.print("WARN code=NVS_LOAD_FAILED reason=");
+    Serial.println(configErrorName(reason));
 }
 
 void Config::warnNvsLoad(ConfigError reason) const
 {
-    printNvsWarning(reason, _configMode);
+    printNvsWarning(reason);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,47 +86,35 @@ void Config::warnNvsLoad(ConfigError reason) const
 
 Config::Config()
     : _keypad(nullptr)
-    , _configMode(false)
-    , _bannerShown(false)
     , _testMode(false)
     , _lineLen(0)
-    , _lastStatsMs(0)
 {
 }
 
-void Config::printBanner() const
+void Config::begin(Keypad& keypad)
 {
-    Serial.println();
-    Serial.println("=== USB HID keypad � CONFIG MODE ===");
-    Serial.println("Hold any switch while plugging in to enter this mode.");
-    Serial.println("Type 'help' for commands. Reboot (RESET) to play.");
-    Serial.println();
-    printBindings(*_keypad, Serial);
-}
-
-void Config::begin(Keypad& keypad, bool configMode)
-{
-    _keypad    = &keypad;
-    _configMode = configMode;
-
-    // Always load saved bindings (so your config persists across reboots in
-    // normal mode too). If NVS has nothing yet, Keypad's defaults stay.
+    _keypad = &keypad;
+    // CDC is always available in the unified operating mode.
+    Serial.begin(CDC_BAUD_RATE);
     loadFromNvs();
-
-    if (_configMode) {
-        // CDC Serial: begin() is a no-op for CDC but harmless and conventional.
-        Serial.begin(CDC_BAUD_RATE);
-        // Banner is printed from poll() once a terminal is attached, because
-        // the host may not have enumerated the CDC port yet at this instant.
-    }
 }
 
 // --- Versioned NVS persistence ----------------------------------------------
 
 static ConfigError configErrorFor(StorageResult result) { switch(result) { case StorageResult::OpenFailed:return ConfigError::NvsOpenFailed; case StorageResult::Missing:return ConfigError::NvsMissing; case StorageResult::SizeMismatch:return ConfigError::NvsSizeMismatch; case StorageResult::BadMagic:return ConfigError::NvsBadMagic; case StorageResult::BadVersion:return ConfigError::NvsBadVersion; case StorageResult::BadLength:return ConfigError::NvsBadLength; case StorageResult::BadCrc:return ConfigError::NvsBadCrc; case StorageResult::BadHidCode:return ConfigError::NvsBadHidCode; case StorageResult::WriteFailed:return ConfigError::NvsWriteFailed; case StorageResult::Loaded: break; } return ConfigError::NvsOpenFailed; }
 
-void Config::loadFromNvs() { const StorageResult result=loadBindings(*_keypad); if(result!=StorageResult::Loaded && result!=StorageResult::Missing) warnNvsLoad(configErrorFor(result)); }
-bool Config::saveToNvs() { return saveBindings(*_keypad)==StorageResult::Loaded; }
+void Config::loadFromNvs()
+{
+    const StorageResult result = loadBindings(*_keypad);
+    if (result != StorageResult::Loaded && result != StorageResult::Missing) {
+        warnNvsLoad(configErrorFor(result));
+    }
+}
+
+bool Config::saveToNvs()
+{
+    return saveBindings(*_keypad) == StorageResult::Loaded;
+}
 
 
 void Config::processKeyEvent(const KeyEvent& event)
@@ -144,22 +131,7 @@ void Config::processKeyEvent(const KeyEvent& event)
 
 void Config::poll()
 {
-    // CDC commands are available in both modes. In normal mode this provides
-    // diagnostics and runtime configuration without changing HID event flow.
-    // The config-mode banner remains exclusive to config mode.
-    if (_configMode) {
-        if (Serial) {
-            if (!_bannerShown) {
-                printBanner();
-                _bannerShown = true;
-            }
-        } else {
-            _bannerShown = false;
-        }
-    } else {
-        _bannerShown = false;
-    }
-
+    // CDC commands and HID output are active together.
     // Non-blocking line accumulation.
     while (Serial.available()) {
         const int c = Serial.read();
@@ -253,6 +225,7 @@ void Config::handleLine()
         }
     } else if (nameEq(tok[0], "reset")) {
         _keypad->loadDefaultBindings();
+        _keypad->setDebounce(DeviceProfile::DEFAULT_DEBOUNCE_SAMPLES);
         Serial.println("OK reset defaults_restored=true persisted=false");
     } else if (nameEq(tok[0], "bind")) {
         if (n < 3) {

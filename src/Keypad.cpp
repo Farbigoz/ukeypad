@@ -111,17 +111,6 @@ void Keypad::loadDefaultBindings()
     }
 }
 
-bool Keypad::anySwitchHeld() const
-{
-    // digitalRead is fine at boot — fast enough for a one-time check.
-    for (uint8_t i = 0; i < KEY_COUNT; ++i) {
-        if (digitalRead(BINDINGS[i].pin) == LOW) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void Keypad::setDebounce(uint8_t samples)
 {
     for (uint8_t i = 0; i < KEY_COUNT; ++i) {

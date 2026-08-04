@@ -30,26 +30,20 @@ class Config {
 public:
     Config();
 
-    void begin(Keypad& keypad, bool configMode);
+    void begin(Keypad& keypad);
     void poll();
     void processKeyEvent(const KeyEvent& event);
-
-    bool isConfigMode() const { return _configMode; }
 
 private:
     void handleLine();
     void loadFromNvs();
     bool saveToNvs();
     void warnNvsLoad(ConfigError reason) const;
-    void printBanner() const;
 
     Keypad* _keypad;
-    bool _configMode;
-    bool _bannerShown;
     bool _testMode;
     char _line[48];
     uint8_t _lineLen;
-    uint32_t _lastStatsMs;
 };
 
 #endif // CONFIG_H

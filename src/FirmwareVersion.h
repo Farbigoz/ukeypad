@@ -15,7 +15,7 @@ constexpr const char* STRING = "0.2.0";
 constexpr uint8_t PROTOCOL = 1;
 
 // Binary NVS binding-record format version.
-constexpr uint8_t CONFIG_FORMAT = 1;
+constexpr uint8_t CONFIG_FORMAT = 2;
 
 } // namespace FirmwareVersion
 

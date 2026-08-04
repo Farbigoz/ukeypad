@@ -16,12 +16,12 @@ Do not duplicate its values in firmware or documentation.
 
 | Slot | GPIO | Default key | HID usage |
 |---:|---:|---|---:|
-| 0 | 4  | Z   | 0x1D |
-| 1 | 5  | X   | 0x1B |
-| 2 | 6  | C   | 0x06 |
-| 3 | 7  | V   | 0x19 |
-| 4 | 15 | F13 | 0x68 |
-| 5 | 16 | F14 | 0x69 |
+| 0 | 1 | Z | 0x1D |
+| 1 | 2 | X | 0x1B |
+| 2 | 3 | C | 0x06 |
+| 3 | 4 | V | 0x19 |
+| 4 | 5 | S | 0x16 |
+| 5 | 6 | D | 0x07 |
 
 Each switch is wired between its GPIO and GND. Internal pull-ups are enabled;
 pressed means the pin reads LOW.
@@ -47,8 +47,8 @@ profile-defined hardware timer ISR
 - USB HID polling uses the standard 1 ms full-speed interval.
 - The default debounce threshold is `DeviceProfile::DEFAULT_DEBOUNCE_SAMPLES`
   (currently 4), approximately 2 ms at the current scan rate.
-- `debounce set N` changes the active threshold until reboot; debounce is not
-  persisted in NVS.
+- `debounce set N` changes the active threshold; `save` persists it in NVS
+  alongside the bindings.
 - The current USB keyboard report supports six simultaneous non-modifier keys;
 this is a HID report limitation, not a limit on the number of physical inputs
 in a compile-time profile.
@@ -97,16 +97,14 @@ Then open `http://localhost:8000/` or
 ### Usage
 
 1. Unplug the keypad.
-2. Hold any one button while connecting USB to enter config mode.
-3. Open the configurator and click **Подключить CDC**.
+2. Open the configurator and click **Подключить CDC**.
 4. Select the keypad's CDC COM port.
 5. Change key selectors; each change sends a `bind <slot> <key>` command.
 6. Click **Сохранить в NVS** to persist bindings.
 7. Use `test`, `debounce`, `stats`, `info`, and `get_device` as needed.
-8. Tap RESET without holding a key to return to normal keyboard mode.
 
-Config mode uses the same profile-defined scan, debounce, and event queue as
-normal mode. Events are consumed by `Config` and never sent as HID reports.
+Test output is additive: debounced events are reported over CDC while the same
+events continue to produce HID reports.
 
 ## Build and upload
 
@@ -148,12 +146,8 @@ active physical wiring is defined by `DeviceProfile.h`.
 
 ## Configuring bindings
 
-The device has two boot-selected modes:
-
-| Mode | Entry | Scanning | CDC |
-|---|---|---|---|
-| Keyboard | Plug in normally | On, profile-defined | Inert |
-| Config | Hold any switch while connecting | On, profile-defined | Commands accepted; HID suppressed |
+The device uses one unified operating mode: profile-defined scanning, CDC
+commands, diagnostics, and HID output are active together.
 
 Available commands:
 
@@ -186,7 +180,7 @@ multiline description:
 ```text
 OK device_begin
 OK device model=ukeypad-esp32-s3 firmware=0.2.0 protocol=1 config_version=1
-OK inputs count=6 types=digital,digital,digital,digital,digital,digital pins=4,5,6,7,15,16
+OK inputs count=6 types=digital,digital,digital,digital,digital,digital pins=1,2,3,4,5,6
 OK leds count=0
 OK capabilities binds=true test=true debounce=true stats=true
 OK device_end
@@ -205,9 +199,12 @@ profile-sized versioned record:
 | 2 | 1 | record version from `FirmwareVersion.h` |
 | 3 | 1 | payload length (`input_count` for the selected profile) |
 | 4 | `input_count` | one HID usage byte per slot |
-| `4 + input_count` | 2 | CRC-16/CCITT over the header and binding payload, little-endian |
+| `4 + input_count` | 1 | persisted debounce samples |
+| `5 + input_count` | 2 | CRC-16/CCITT over the complete record, little-endian |
 
-The firmware deliberately does not read or migrate the old raw six-byte format.
+The firmware deliberately does not read or migrate older binding records. The
+current record also stores the shared debounce threshold; invalid or missing
+records leave compiled-in defaults active.
 Missing, truncated, unknown-version, corrupt, or invalid records leave the
 compiled-in profile defaults active. A failed save returns
 `ERR code=NVS_WRITE_FAILED`.
@@ -220,7 +217,7 @@ ukeypad/
 ├── src/
 │   ├── DeviceProfile.h       # compile-time hardware profile
 │   ├── FirmwareVersion.h     # firmware/protocol/storage versions
-│   ├── main.cpp              # timer, boot mode, event loop
+│   ├── main.cpp              # timer and unified event loop
 │   ├── Button.h/.cpp         # one digital input and debounce
 │   ├── Keypad.h/.cpp         # scan, queue, runtime bindings
 │   ├── HidKeycode.h          # HID usage enum
@@ -251,7 +248,8 @@ There is no single latency number; measure each link separately:
    polling is normally 1 ms.
 5. **End to end:** timestamp a known fast input edge and host HID reception.
 
-Hardware behavior has not been validated unless the device was actually tested.
+Held-key USB disconnect/reconnect has been validated on the reference device: no
+stuck key remains after reconnect. Other hardware behavior still requires testing.
 
 ## Future development
 
