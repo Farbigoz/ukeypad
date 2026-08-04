@@ -44,9 +44,7 @@ python -c "from html.parser import HTMLParser; HTMLParser().feed(open('utils/con
 git status --short --branch
 ```
 
-There is no automated unit-test or lint suite. Firmware validation is the
-PlatformIO build plus hardware checks in [README.md](README.md). Never claim
-hardware behavior was verified unless the device was actually tested.
+Unit tests run in the host-native PlatformIO environment with `pio test -e native_test`; they cover pure lookup, CRC/HID validation, and debounce logic. Firmware validation is the PlatformIO build plus hardware checks in [README.md](README.md). Native tests do not verify USB, timers, ISR timing, or real NVS behavior. Never claim hardware behavior was verified unless the device was actually tested.
 
 For flashing, if native USB is not enumerated as an upload port, hold BOOT, tap
 RESET, release BOOT, then run the upload command. The application uses USB-OTG/

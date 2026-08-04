@@ -1,6 +1,7 @@
 #include "Button.h"
 #include <Arduino.h>
 #include "soc/gpio_struct.h"
+#include "ButtonDebounce.h"
 
 // ---------------------------------------------------------------------------
 //  fastReadPin
@@ -48,31 +49,7 @@ IRAM_ATTR ButtonEvent Button::update()
     // actuated (pin pulled low).
     const bool raw = fastReadPin(_pin);
 
-    ButtonEvent event = ButtonEvent::None;
-
-    if (raw) {
-        // Saturate the integrator upwards.
-        if (_integrator < _maxIntegrator) {
-            ++_integrator;
-        }
-        // Emit Press exactly once, on the rising edge of the debounced state.
-        if (_integrator == _maxIntegrator && !_state) {
-            _state = true;
-            event = ButtonEvent::Press;
-        }
-    } else {
-        // Saturate the integrator downwards.
-        if (_integrator > 0) {
-            --_integrator;
-        }
-        // Emit Release exactly once, on the falling edge.
-        if (_integrator == 0 && _state) {
-            _state = false;
-            event = ButtonEvent::Release;
-        }
-    }
-
-    return event;
+    return debounceStep(raw, _integrator, _maxIntegrator, _state);
 }
 
 bool Button::rawPressed() const

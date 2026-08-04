@@ -2,14 +2,12 @@
 #include "Keypad.h"
 #include "FirmwareVersion.h"
 #include <Preferences.h>
+#include "Crc16.h"
 
 namespace {
 
 constexpr const char* NVS_NAMESPACE = "ukeypad";
 constexpr const char* NVS_KEY = "bindings";
-constexpr uint16_t CRC16_INITIAL = 0xFFFF;
-constexpr uint16_t CRC16_POLYNOMIAL = 0x1021;
-constexpr uint16_t CRC16_TOP_BIT = 0x8000;
 constexpr uint16_t NVS_MAGIC = 0x4B50;
 constexpr uint8_t NVS_VERSION = FirmwareVersion::CONFIG_FORMAT;
 constexpr uint8_t NVS_HEADER_SIZE = 4;
@@ -23,27 +21,6 @@ constexpr uint8_t HID_FIRST_DEFINED = 0x04;
 constexpr uint8_t HID_LAST_DEFINED = 0xA4;
 constexpr uint8_t HID_FIRST_MODIFIER = 0xE0;
 constexpr uint8_t HID_LAST_MODIFIER = 0xE7;
-
-uint16_t crc16(const uint8_t* data, size_t length)
-{
-    uint16_t crc = CRC16_INITIAL;
-    for (size_t i = 0; i < length; ++i) {
-        crc ^= static_cast<uint16_t>(data[i]) << 8;
-        for (uint8_t bit = 0; bit < 8; ++bit) {
-            crc = (crc & CRC16_TOP_BIT)
-                ? static_cast<uint16_t>((crc << 1) ^ CRC16_POLYNOMIAL)
-                : static_cast<uint16_t>(crc << 1);
-        }
-    }
-    return crc;
-}
-
-bool isValidHidCode(uint8_t raw)
-{
-    return raw == HID_NONE ||
-           (raw >= HID_FIRST_DEFINED && raw <= HID_LAST_DEFINED) ||
-           (raw >= HID_FIRST_MODIFIER && raw <= HID_LAST_MODIFIER);
-}
 
 } // namespace
 
@@ -68,7 +45,7 @@ StorageResult loadBindings(Keypad& keypad)
     const uint8_t crcOffset = NVS_HEADER_SIZE + NVS_PAYLOAD_SIZE;
     const uint16_t storedCrc = static_cast<uint16_t>(record[crcOffset]) |
                                (static_cast<uint16_t>(record[crcOffset + 1]) << 8);
-    if (crc16(record, crcOffset) != storedCrc) return StorageResult::BadCrc;
+    if (crc16Ccitt(record, crcOffset) != storedCrc) return StorageResult::BadCrc;
 
     for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
         if (!isValidHidCode(record[NVS_HEADER_SIZE + i])) {
@@ -101,7 +78,7 @@ StorageResult saveBindings(const Keypad& keypad)
     record[NVS_HEADER_SIZE + Keypad::KEY_COUNT] = keypad.debounce();
 
     const uint8_t crcOffset = NVS_HEADER_SIZE + NVS_PAYLOAD_SIZE;
-    const uint16_t calculatedCrc = crc16(record, crcOffset);
+    const uint16_t calculatedCrc = crc16Ccitt(record, crcOffset);
     record[crcOffset] = static_cast<uint8_t>(calculatedCrc & 0xFF);
     record[crcOffset + 1] = static_cast<uint8_t>(calculatedCrc >> 8);
 

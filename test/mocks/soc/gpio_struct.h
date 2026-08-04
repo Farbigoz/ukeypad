@@ -1,0 +1,3 @@
+#ifndef UKEYPAD_TEST_GPIO_STRUCT_H
+#define UKEYPAD_TEST_GPIO_STRUCT_H
+#endif
