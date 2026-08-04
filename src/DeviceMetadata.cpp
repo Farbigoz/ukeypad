@@ -91,8 +91,10 @@ void printHelp(Print& out)
     out.print(Keypad::KEY_COUNT - 1);
     out.println(") to a key");
     out.println("  list                show current bindings");
-    out.println("  save                write bindings to flash (NVS)");
+    out.println("  save                write bindings and debounce to NVS");
     out.println("  reset               restore defaults (RAM; 'save' to keep)");
+    out.println("  boot                reboot into ESP32-S3 download mode");
+    out.println("  download            alias for boot");
     out.println("  info                firmware and hardware information");
     out.println("  get_device          complete machine-readable device description");
     out.println("  test [on|off]       monitor raw GPIO transitions");

@@ -145,7 +145,12 @@ test [on|off]
 debounce [get|set N]
 stats [clear]
 help
+boot
 ```
+
+`boot` (also accepted as `download`) switches the ESP32-S3 into ROM download
+mode through the installed TinyUSB restart API. It is issued from the main task,
+not the scan ISR, and the physical BOOT + RESET procedure remains the fallback.
 
 Responses must remain deterministic and machine-parseable: success begins with
 `OK`, command errors use `ERR code=...`, and `list` ends with `OK list`.

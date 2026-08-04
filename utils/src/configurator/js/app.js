@@ -1,6 +1,10 @@
   $('connect').onclick = connect;
   $('disconnect').onclick = disconnect;
   $('clearLog').onclick = () => { $('log').textContent = ''; };
+  $('boot').onclick = async () => {
+    if (!confirm('Перейти в ROM bootloader? Устройство отключится от USB.')) return;
+    await command('boot');
+  };
   $('clearEvents').onclick = () => {
     $('events').replaceChildren();
     $('events').classList.add('empty-state');

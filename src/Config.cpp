@@ -5,6 +5,7 @@
 #include "KeyNameTable.h"
 #include "ConfigStorage.h"
 #include "DeviceProfile.h"
+#include "esp32-hal-tinyusb.h"
 
 namespace {
 static bool nameEq(const char* a, const char* b)
@@ -217,6 +218,16 @@ void Config::handleLine()
         printHelp(Serial);
     } else if (nameEq(tok[0], "list")) {
         printBindings(*_keypad, Serial);
+    } else if (nameEq(tok[0], "boot") || nameEq(tok[0], "download")) {
+        if (n != 1) {
+            printError(ConfigError::InvalidArgument, "usage", "boot");
+            return;
+        }
+        Serial.println("OK boot=download");
+        Serial.flush();
+        delay(50);
+        usb_persist_restart(RESTART_BOOTLOADER);
+        return;
     } else if (nameEq(tok[0], "save")) {
         if (saveToNvs()) {
             Serial.println("OK saved");

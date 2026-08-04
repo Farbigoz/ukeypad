@@ -158,6 +158,7 @@ save
 reset
 info
 get_device
+boot
 test [on|off]
 debounce [get|set N]
 stats [clear]
@@ -171,6 +172,11 @@ and [src/HidKeycode.h](src/HidKeycode.h).
 
 Successful responses begin with `OK`; command errors begin with
 `ERR code=...`. The `list` response ends with `OK list`.
+
+`boot` (also accepted as `download`) flushes a confirmation and reboots the
+ESP32-S3 into ROM download mode. The USB application device disconnects; run
+`pio run -t upload` against the newly enumerated download port. The physical
+BOOT + RESET procedure remains the fallback if the command cannot be used.
 
 ### Device description
 

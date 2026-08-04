@@ -21,7 +21,7 @@ Implemented today:
 - simultaneous keys and duplicate logical bindings;
 - unified CDC + HID operation with an always-available configuration channel;
 - NVS-persisted key bindings;
-- text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `test`,
+- text CDC protocol: `bind`, `list`, `save`, `reset`, `info`, `boot`, `test`,
   `debounce`, `stats`, `help`;
 - standalone Web Serial GUI in [utils/configurator.html](utils/configurator.html);
 - centralized compile-time profile in `src/DeviceProfile.h`;
