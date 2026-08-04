@@ -1,21 +1,10 @@
 #include "Button.h"
-#include <Arduino.h>
-#include "soc/gpio_struct.h"
+#include "hw/HwApi.h"
 #include "ButtonDebounce.h"
 
-// ---------------------------------------------------------------------------
-//  fastReadPin
-//  Reads a GPIO pin state. digitalRead() is used here instead of direct
-//  register access because the GPIO register struct layout varies across
-//  ESP32 Arduino core versions (GPIO.in is uint32_t on some, a union on
-//  others; GPIO.in1 likewise). At 2000 Hz × 6 pins = 12000 calls/sec,
-//  each digitalRead costs ~1 µs; the total remains negligible for the ISR.
-//  flash cache is always on at runtime (we never erase/write flash from the
-//  ISR), so digitalRead from IRAM context is safe.
-// ---------------------------------------------------------------------------
-static inline IRAM_ATTR bool fastReadPin(uint8_t pin)
+static inline bool fastReadPin(uint8_t pin)
 {
-    return digitalRead(pin) == LOW;
+    return Hw::gpioReadPressed(pin);
 }
 
 Button::Button()
@@ -37,13 +26,13 @@ void Button::begin(uint8_t pin)
     // holds the pin HIGH while open; pressing the switch pulls it LOW.
     //   released  -> pin reads HIGH (1)
     //   pressed  -> pin reads LOW  (0)
-    pinMode(pin, INPUT_PULLUP);
+    Hw::gpioBeginInputPullup(pin);
 }
 
 // IRAM_ATTR is repeated on the definition (not only on the declaration in
 // the header) to guarantee placement in the IRAM section: the function runs
 // from the profile-defined scan ISR and must not depend on flash access.
-IRAM_ATTR ButtonEvent Button::update()
+ButtonEvent Button::update()
 {
     // fastReadPin() already returns true while the switch is physically
     // actuated (pin pulled low).
@@ -54,7 +43,7 @@ IRAM_ATTR ButtonEvent Button::update()
 
 bool Button::rawPressed() const
 {
-    return digitalRead(_pin) == LOW;
+    return Hw::gpioReadPressed(_pin);
 }
 
 void Button::setDebounce(uint8_t samples)

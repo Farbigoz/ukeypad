@@ -1,8 +1,7 @@
 #ifndef HIDKEYBOARD_H
 #define HIDKEYBOARD_H
 
-#include <USB.h>
-#include <USBHIDKeyboard.h>
+#include <stdint.h>
 #include "Keypad.h"
 
 // ---------------------------------------------------------------------------
@@ -34,9 +33,8 @@ public:
     void releaseAll();
 
 private:
-    static void onUsbEvent(void* arg, esp_event_base_t base, int32_t id, void* data);
-    USBHIDKeyboard _kbd;
-    uint8_t        _refCount[256];
+    static void onUsbDisconnect();
+    uint8_t _refCount[256];
 };
 
 #endif // HIDKEYBOARD_H

@@ -1,5 +1,5 @@
 #include "KeyNameTable.h"
-#include <Arduino.h>
+#include <ctype.h>
 
 // ---------------------------------------------------------------------------
 //  Key-name -> HidKeycode lookup (case-insensitive). Covers keys most likely

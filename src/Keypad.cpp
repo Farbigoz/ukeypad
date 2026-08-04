@@ -1,5 +1,5 @@
 #include "Keypad.h"
-#include <Arduino.h>
+#include "hw/HwApi.h"
 
 //  Live bindings — mutable so the config channel can reassign keycodes at
 //  runtime. Pins are fixed (hardware); only hidCode is ever changed, and a
@@ -27,7 +27,7 @@ void Keypad::begin()
 
 // IRAM_ATTR repeated on the definition for the same reason as Button::update:
 // this runs from the scan ISR.
-IRAM_ATTR uint8_t Keypad::scan()
+uint8_t Keypad::scan()
 {
     ++_scanCount;
     uint8_t pushed = 0;

@@ -12,38 +12,25 @@
 
 //
 #include <Arduino.h>
-#include <freertos/semphr.h>
 
 #include "Keypad.h"
 #include "HidKeyboard.h"
 #include "Config.h"
 #include "DeviceProfile.h"
-
-// Hardware timer settings come from the selected device profile. The legacy
-// Arduino timer API remains intentionally unchanged for this environment.
-//  Semaphore: signalled from the scan ISR when >= 1 event was queued.
-//  Lets the main loop sleep instead of busy-spinning, without adding latency.
-static SemaphoreHandle_t s_eventSem = nullptr;
+#include "hw/HwApi.h"
 
 static Keypad      g_keypad;
 static HidKeyboard g_hid;
 static Config      g_config;
-static hw_timer_t* g_scanTimer = nullptr;
 
 // ---------------------------------------------------------------------------
 //  Scan ISR — runs in hardware-timer interrupt context.
 //  Only samples GPIOs, debounces and queues events. Never touches USB here
 //  (TinyUSB is not ISR-safe); USB reports are sent from the main loop.
 // ---------------------------------------------------------------------------
-void ARDUINO_ISR_ATTR onScanTimer()
+void onScanTimer()
 {
-    if (g_keypad.scan() > 0) {
-        BaseType_t higherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(s_eventSem, &higherPriorityTaskWoken);
-        if (higherPriorityTaskWoken == pdTRUE) {
-            portYIELD_FROM_ISR();
-        }
-    }
+    g_keypad.scan();
 }
 
 void setup()
@@ -57,18 +44,12 @@ void setup()
     // CDC commands and HID output are available together.
     g_config.begin(g_keypad);
 
-    // Event semaphore (binary). Created before the timer starts so the ISR
-    // never runs against a null handle.
-    s_eventSem = xSemaphoreCreateBinary();
-
-    // Start the profile-defined scan timer. Debounced events are forwarded to
-    // both HID and the optional CDC test logger from the main loop.
-    g_scanTimer = timerBegin(DeviceProfile::TIMER_NUMBER,
-                             DeviceProfile::TIMER_DIVIDER,
-                             true);
-    timerAttachInterrupt(g_scanTimer, &onScanTimer, true);
-    timerAlarmWrite(g_scanTimer, DeviceProfile::SCAN_ALARM_TICKS, true);
-    timerAlarmEnable(g_scanTimer); // DeviceProfile::SCAN_FREQUENCY_HZ Hz
+    // Start the profile-defined scan timer through the selected hardware
+    // backend. Debounced events are forwarded from the main loop.
+    Hw::beginScanTimer(DeviceProfile::TIMER_NUMBER,
+                       DeviceProfile::TIMER_DIVIDER,
+                       DeviceProfile::SCAN_ALARM_TICKS,
+                       &onScanTimer);
 }
 
 void loop()
@@ -79,7 +60,7 @@ void loop()
 
     // Block until the scan ISR signals an event (or 2 ms safety timeout), then
     // deliver every event to both the HID adapter and optional CDC test output.
-    xSemaphoreTake(s_eventSem, pdMS_TO_TICKS(2));
+    Hw::waitForScanEvent(2);
     KeyEvent ev;
     while (g_keypad.getEvent(ev)) {
         g_hid.handleEvent(ev);

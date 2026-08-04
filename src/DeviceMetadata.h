@@ -2,7 +2,7 @@
 #define DEVICE_METADATA_H
 
 #include <stdint.h>
-#include <Arduino.h>
+#include "TextWriter.h"
 #include "Keypad.h"
 
 struct DeviceMetadata {
@@ -22,9 +22,9 @@ struct DeviceMetadata {
 
 extern const DeviceMetadata DEVICE_METADATA;
 
-void printInfo(Print& out);
-void printDeviceDescription(const Keypad& keypad, Print& out);
-void printBindings(const Keypad& keypad, Print& out);
-void printHelp(Print& out);
+void printInfo(TextWriter& out);
+void printDeviceDescription(const Keypad& keypad, TextWriter& out);
+void printBindings(const Keypad& keypad, TextWriter& out);
+void printHelp(TextWriter& out);
 
 #endif // DEVICE_METADATA_H

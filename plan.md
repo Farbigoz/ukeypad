@@ -287,8 +287,12 @@ six-byte NVS format; test that old records are rejected and defaults are used.
 
 ## Phase 8 — Additional MCU backends
 
-Not started. Follow the platform acceptance policy below; do not advertise a
-backend before real USB, timing, storage, and (where applicable) ADC/DMA tests.
+Not started. The first preparatory step is complete: common firmware logic now
+uses the small `src/hw/HwApi.h` contract, and the current ESP32-S3 implementation
+lives in `src/hw/esp32s3/Esp32S3Hw.cpp`. This is an architectural separation,
+not support for another MCU. Follow the platform acceptance policy below; do not
+advertise a backend before real USB, timing, storage, and (where applicable)
+ADC/DMA tests.
 
 ---
 

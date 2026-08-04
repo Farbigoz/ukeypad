@@ -18,7 +18,7 @@ const DeviceMetadata DEVICE_METADATA = {
     DeviceProfile::CAP_STATS,
 };
 
-static void printDeviceFields(Print& out)
+static void printDeviceFields(TextWriter& out)
 {
     out.print("model="); out.print(DEVICE_METADATA.model);
     out.print(" firmware="); out.print(DEVICE_METADATA.firmware);
@@ -26,7 +26,7 @@ static void printDeviceFields(Print& out)
     out.print(" config_version="); out.print(DEVICE_METADATA.configVersion);
 }
 
-static void printInputTypes(Print& out)
+static void printInputTypes(TextWriter& out)
 {
     for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
         if (i > 0) out.print(',');
@@ -34,7 +34,7 @@ static void printInputTypes(Print& out)
     }
 }
 
-void printInfo(Print& out)
+void printInfo(TextWriter& out)
 {
     out.print("OK info ");
     printDeviceFields(out);
@@ -49,7 +49,7 @@ void printInfo(Print& out)
     out.print(" usb="); out.println(DEVICE_METADATA.usb);
 }
 
-void printDeviceDescription(const Keypad& keypad, Print& out)
+void printDeviceDescription(const Keypad& keypad, TextWriter& out)
 {
     out.println("OK device_begin");
     out.print("OK device "); printDeviceFields(out); out.println();
@@ -68,7 +68,7 @@ void printDeviceDescription(const Keypad& keypad, Print& out)
     out.println("OK device_end");
 }
 
-void printBindings(const Keypad& keypad, Print& out)
+void printBindings(const Keypad& keypad, TextWriter& out)
 {
     out.println("Current bindings:");
     for (uint8_t i = 0; i < Keypad::KEY_COUNT; ++i) {
@@ -84,7 +84,7 @@ void printBindings(const Keypad& keypad, Print& out)
     out.println("OK list");
 }
 
-void printHelp(Print& out)
+void printHelp(TextWriter& out)
 {
     out.println("Commands:");
     out.print("  bind <slot> <key>   set slot (0..");

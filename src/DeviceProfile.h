@@ -56,11 +56,13 @@ constexpr uint8_t INPUT_COUNT = sizeof(INPUTS) / sizeof(INPUTS[0]);
 //  ESP32-S3 legacy timer profile
 // ---------------------------------------------------------------------------
 
-constexpr uint8_t TIMER_NUMBER = 0;
-constexpr uint32_t APB_CLOCK_HZ = 80000000;
-constexpr uint16_t TIMER_DIVIDER = 80;
-constexpr uint32_t TIMER_TICK_HZ = APB_CLOCK_HZ / TIMER_DIVIDER;
 constexpr uint32_t SCAN_FREQUENCY_HZ = 2000;
+
+// The current ESP32-S3 backend uses these legacy timer parameters. They stay
+// in the profile contract until a second backend needs a different derivation.
+constexpr uint8_t TIMER_NUMBER = 0;
+constexpr uint16_t TIMER_DIVIDER = 80;
+constexpr uint32_t TIMER_TICK_HZ = 80000000 / TIMER_DIVIDER;
 constexpr uint64_t SCAN_ALARM_TICKS = TIMER_TICK_HZ / SCAN_FREQUENCY_HZ;
 
 // ---------------------------------------------------------------------------

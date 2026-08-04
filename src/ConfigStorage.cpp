@@ -1,7 +1,7 @@
 #include "ConfigStorage.h"
 #include "Keypad.h"
 #include "FirmwareVersion.h"
-#include <Preferences.h>
+#include "hw/HwApi.h"
 #include "Crc16.h"
 
 namespace {
@@ -26,12 +26,11 @@ constexpr uint8_t HID_LAST_MODIFIER = 0xE7;
 
 StorageResult loadBindings(Keypad& keypad)
 {
-    Preferences prefs;
-    if (!prefs.begin(NVS_NAMESPACE, true)) return StorageResult::OpenFailed;
-
     uint8_t record[NVS_RECORD_SIZE];
-    const size_t bytesRead = prefs.getBytes(NVS_KEY, record, sizeof(record));
-    prefs.end();
+    size_t bytesRead = 0;
+    if (!Hw::storageRead(NVS_NAMESPACE, NVS_KEY, record, sizeof(record), bytesRead)) {
+        return StorageResult::OpenFailed;
+    }
     if (bytesRead != sizeof(record)) {
         return bytesRead == 0 ? StorageResult::Missing : StorageResult::SizeMismatch;
     }
@@ -82,9 +81,6 @@ StorageResult saveBindings(const Keypad& keypad)
     record[crcOffset] = static_cast<uint8_t>(calculatedCrc & 0xFF);
     record[crcOffset + 1] = static_cast<uint8_t>(calculatedCrc >> 8);
 
-    Preferences prefs;
-    if (!prefs.begin(NVS_NAMESPACE, false)) return StorageResult::OpenFailed;
-    const size_t bytesWritten = prefs.putBytes(NVS_KEY, record, sizeof(record));
-    prefs.end();
-    return bytesWritten == sizeof(record) ? StorageResult::Loaded : StorageResult::WriteFailed;
+    return Hw::storageWrite(NVS_NAMESPACE, NVS_KEY, record, sizeof(record))
+        ? StorageResult::Loaded : StorageResult::WriteFailed;
 }
